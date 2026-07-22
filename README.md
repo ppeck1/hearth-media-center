@@ -46,6 +46,12 @@ Run the repository checks before publishing or deploying changes:
 ./verify/verify-project.sh
 ```
 
+On a Windows editing machine, run the equivalent local checks with:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\verify\verify-project.ps1
+```
+
 ## Privacy and repository boundaries
 
 This repository intentionally contains no ROMs, media-library inventory, BIOS or save data, credentials, browser profiles, cookies, account details, or login data. Private storage locations and application access are configured only on the machine running Hearth Media Center.

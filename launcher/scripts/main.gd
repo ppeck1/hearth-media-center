@@ -8,10 +8,10 @@ const MUTED := Color("aeb9c8")
 const MENU_PATH := "res://config/menu.json"
 const REGISTRY_PATH := "res://config/system-registry.json"
 const LIBRARY_ROOT := "/srv/library/games/roms"
-const HOME_BACKGROUND := preload("res://assets/backgrounds/arcade-living-room-v2.png")
+const HOME_BACKGROUND := preload("res://assets/backgrounds/arcade-living-room-v3.png")
 const ARCADE_BACKGROUND_PATH := "res://assets/backgrounds/arcade-attract-v1.png"
 const VIDEO_CLUB_BACKGROUND_PATH := "res://assets/backgrounds/video-club-aisle-v1.png"
-const CONSOLE_GALLERY_BACKGROUND_PATH := "res://assets/backgrounds/arcade-living-room-v2.png"
+const CONSOLE_GALLERY_BACKGROUND_PATH := "res://assets/backgrounds/console-gallery-v1.png"
 const ArcadeFx := preload("res://scripts/arcade_fx.gd")
 const ART_SHADER_CODE := """
 shader_type canvas_item;
