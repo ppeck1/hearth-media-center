@@ -10,6 +10,8 @@ const REGISTRY_PATH := "res://config/system-registry.json"
 const LIBRARY_ROOT := "/srv/library/games/roms"
 const HOME_BACKGROUND := preload("res://assets/backgrounds/arcade-living-room-v1.png")
 const ARCADE_BACKGROUND_PATH := "res://assets/backgrounds/arcade-attract-v1.png"
+const VIDEO_CLUB_BACKGROUND_PATH := "res://assets/backgrounds/video-club-aisle-v1.png"
+const CONSOLE_GALLERY_BACKGROUND_PATH := "res://assets/backgrounds/console-gallery-v1.png"
 const ArcadeFx := preload("res://scripts/arcade_fx.gd")
 
 var background: TextureRect
@@ -168,16 +170,27 @@ func _add_card(item: Dictionary) -> void:
     box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     box.add_theme_constant_override("separation", 10)
     card.add_child(box)
-    var mark := Label.new()
-    mark.text = str(item.get("mark", "•"))
-    mark.size_flags_vertical = Control.SIZE_EXPAND_FILL
-    mark.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    mark.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-    mark.add_theme_font_size_override("font_size", 86)
-    mark.add_theme_color_override("font_color", Color(accent, 1.0))
-    mark.add_theme_constant_override("outline_size", 5)
-    mark.add_theme_color_override("font_outline_color", Color(INK, 0.95))
-    box.add_child(mark)
+    var art_path := str(item.get("art", ""))
+    var art_texture: Texture2D = load(art_path) if not art_path.is_empty() else null
+    if art_texture != null:
+        var art := TextureRect.new()
+        art.texture = art_texture
+        art.custom_minimum_size = Vector2(0, 104)
+        art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+        art.modulate = Color(1.0, 1.0, 1.0, 0.96)
+        box.add_child(art)
+    else:
+        var mark := Label.new()
+        mark.text = str(item.get("mark", "•"))
+        mark.size_flags_vertical = Control.SIZE_EXPAND_FILL
+        mark.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        mark.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+        mark.add_theme_font_size_override("font_size", 86)
+        mark.add_theme_color_override("font_color", Color(accent, 1.0))
+        mark.add_theme_constant_override("outline_size", 5)
+        mark.add_theme_color_override("font_outline_color", Color(INK, 0.95))
+        box.add_child(mark)
     var name := Label.new()
     name.text = str(item.get("label", "Item"))
     name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -230,12 +243,22 @@ func _select(index: int, immediate := false) -> void:
     buttons[selected].grab_focus()
 
 func _set_visual_mode(in_library: bool, next_items: Array) -> void:
-    background.texture = load(ARCADE_BACKGROUND_PATH) if in_library else HOME_BACKGROUND
-    veil.color = Color(INK, 0.47 if in_library else 0.60)
-    arcade_fx.set_arcade_mode(in_library)
-    collection_label.visible = in_library
-    selection_label.visible = in_library
-    if in_library:
+    var in_streaming := breadcrumb.text.to_upper().contains("STREAMING")
+    var showcase_mode := in_library or in_streaming
+    if in_streaming:
+        background.texture = load(VIDEO_CLUB_BACKGROUND_PATH)
+    elif in_library:
+        background.texture = load(ARCADE_BACKGROUND_PATH) if breadcrumb.text.ends_with("MY LIBRARY") else load(CONSOLE_GALLERY_BACKGROUND_PATH)
+    else:
+        background.texture = HOME_BACKGROUND
+    veil.color = Color(INK, 0.47 if showcase_mode else 0.60)
+    arcade_fx.set_arcade_mode(showcase_mode)
+    collection_label.visible = showcase_mode
+    selection_label.visible = showcase_mode
+    if in_streaming:
+        marquee.text = "HEARTH  //  VIDEO CLUB"
+        collection_label.text = "%d SERVICES READY" % next_items.size()
+    elif in_library:
         marquee.text = "HEARTH  //  ARCADE VAULT"
         var total_games := 0
         for item in next_items:
