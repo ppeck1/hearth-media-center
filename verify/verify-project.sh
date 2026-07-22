@@ -2,7 +2,7 @@
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 jq -e '.schema_version == 2 and (.items | type == "array")' "${root}/launcher/config/menu.json" >/dev/null
-jq -e '.schema_version == 1 and (.extensions | type == "object")' "${root}/launcher/config/library-profiles.json" >/dev/null
+jq -e '.schema_version == 1 and (.families | type == "array") and (.systems | type == "array")' "${root}/launcher/config/system-registry.json" >/dev/null
 bash -n "${root}/launchers/retroarch-game.sh"
 test -x "${root}/launchers/retroarch-game.sh"
 test -f "${root}/launcher/assets/backgrounds/arcade-living-room-v1.png"

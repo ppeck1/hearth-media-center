@@ -6,7 +6,7 @@ const AMBER := Color("f2a93b")
 const PAPER := Color("f3f5f7")
 const MUTED := Color("aeb9c8")
 const MENU_PATH := "res://config/menu.json"
-const PROFILE_PATH := "res://config/library-profiles.json"
+const REGISTRY_PATH := "res://config/system-registry.json"
 const LIBRARY_ROOT := "/srv/library/games/roms"
 
 var stage: Control
@@ -19,14 +19,16 @@ var modal_label: Label
 var items: Array = []
 var buttons: Array[Button] = []
 var stack: Array = []
-var profiles: Dictionary = {}
+var families: Array = []
+var systems: Array = []
+var folder_aliases: Dictionary = {}
 var selected := 0
 var child_pid := -1
 var last_button: Button
 
 func _ready() -> void:
     _build_ui()
-    _load_profiles()
+    _load_registry()
     _load_home()
 
 func _build_ui() -> void:
@@ -81,13 +83,20 @@ func _label(position_value: Vector2, size_value: Vector2, font_size: int, color:
     label.add_theme_color_override("font_color", color)
     return label
 
-func _load_profiles() -> void:
-    var file := FileAccess.open(PROFILE_PATH, FileAccess.READ)
+func _load_registry() -> void:
+    var file := FileAccess.open(REGISTRY_PATH, FileAccess.READ)
     if file == null:
         return
     var parsed = JSON.parse_string(file.get_as_text())
-    if typeof(parsed) == TYPE_DICTIONARY and parsed.get("schema_version", 0) == 1 and typeof(parsed.get("extensions")) == TYPE_DICTIONARY:
-        profiles = parsed["extensions"]
+    if typeof(parsed) != TYPE_DICTIONARY or parsed.get("schema_version", 0) != 1 or typeof(parsed.get("families")) != TYPE_ARRAY or typeof(parsed.get("systems")) != TYPE_ARRAY:
+        return
+    families = parsed["families"]
+    systems = parsed["systems"]
+    for system in systems:
+        if typeof(system) != TYPE_DICTIONARY:
+            continue
+        for alias in system.get("aliases", []):
+            folder_aliases[str(alias).to_lower()] = system
 
 func _load_home() -> void:
     var file := FileAccess.open(MENU_PATH, FileAccess.READ)
@@ -210,21 +219,47 @@ func _activate(item: Dictionary, card: Button) -> void:
     footer.text = "%s is running…" % str(item.get("label", "Application"))
 
 func _library_systems() -> Array:
-    var systems: Array = []
-    if not DirAccess.dir_exists_absolute(LIBRARY_ROOT):
-        return systems
-    var folders: PackedStringArray = DirAccess.get_directories_at(LIBRARY_ROOT)
-    folders.sort()
-    for folder in folders:
-        if folder.begins_with("."):
+    var buckets: Dictionary = {}
+    for system in systems:
+        if typeof(system) == TYPE_DICTIONARY:
+            buckets[str(system.get("id", ""))] = []
+    var unknown: Dictionary = {}
+    if DirAccess.dir_exists_absolute(LIBRARY_ROOT):
+        var folders: PackedStringArray = DirAccess.get_directories_at(LIBRARY_ROOT)
+        folders.sort()
+        for folder in folders:
+            if folder.begins_with("."):
+                continue
+            var mapped: Dictionary = folder_aliases.get(folder.to_lower(), {})
+            if mapped.is_empty():
+                unknown[folder] = []
+                _scan_system_folder(LIBRARY_ROOT.path_join(folder), {}, unknown[folder])
+            else:
+                _scan_system_folder(LIBRARY_ROOT.path_join(folder), mapped, buckets[str(mapped.get("id", ""))])
+    var family_items: Array = []
+    for family in families:
+        if typeof(family) != TYPE_DICTIONARY:
             continue
-        var games: Array = []
-        _scan_roms(LIBRARY_ROOT.path_join(folder), games)
-        if not games.is_empty():
-            systems.append({"id":"system-" + folder,"label":folder.replace("_", " ").replace("-", " ").capitalize(),"subtitle":"%d ROM%s" % [games.size(), "" if games.size() == 1 else "s"],"hint":"Your personal library","mark":folder.to_upper().left(4),"color":"426d8d","type":"submenu","children":games,"enabled":true})
-    return systems
+        var family_systems: Array = []
+        for system in systems:
+            if typeof(system) == TYPE_DICTIONARY and str(system.get("family", "")) == str(family.get("id", "")):
+                family_systems.append(_system_item(system, buckets.get(str(system.get("id", "")), [])))
+        if not family_systems.is_empty():
+            family_items.append({"id":str(family.get("id", "family")),"label":str(family.get("label", "Systems")),"subtitle":"%d systems" % family_systems.size(),"hint":"Choose a system","mark":str(family.get("mark", "•")),"color":str(family.get("color", "426d8d")),"type":"submenu","children":family_systems,"enabled":true})
+    if not unknown.is_empty():
+        var unknown_systems: Array = []
+        for folder in unknown:
+            unknown_systems.append({"id":"unmapped-" + str(folder),"label":str(folder).replace("_", " ").replace("-", " ").capitalize(),"subtitle":"%d ROM%s • emulator not assigned" % [unknown[folder].size(), "" if unknown[folder].size() == 1 else "s"],"hint":"Add this folder to system-registry.json","mark":"?","color":"5e6470","type":"submenu","children":unknown[folder],"enabled":true})
+        family_items.append({"id":"unmapped","label":"Unmapped Library","subtitle":"Folders without a system profile","hint":"Nothing is hidden","mark":"?","color":"5e6470","type":"submenu","children":unknown_systems,"enabled":true})
+    return family_items
 
-func _scan_roms(folder_path: String, games: Array, depth := 0) -> void:
+func _system_item(system: Dictionary, games: Array) -> Dictionary:
+    var count := games.size()
+    if count == 0:
+        games = [{"id":"empty-" + str(system.get("id", "system")),"label":"No ROMs added yet","subtitle":"Place files in /srv/library/games/roms/<folder>","hint":"This system is ready when you are","mark":"+","color":str(system.get("color", "426d8d")),"type":"unavailable","error":"No ROMs have been added to %s yet." % str(system.get("label", "this system")),"enabled":true}]
+    return {"id":str(system.get("id", "system")),"label":str(system.get("label", "System")),"subtitle":"%d ROM%s • %s" % [count, "" if count == 1 else "s", str(system.get("emulator_label", "RetroArch"))],"hint":"Choose a ROM" if count > 0 else "Placeholder ready for your library","mark":str(system.get("mark", "•")),"color":str(system.get("color", "426d8d")),"type":"submenu","children":games,"enabled":true}
+
+func _scan_system_folder(folder_path: String, system: Dictionary, games: Array, depth := 0) -> void:
     if depth > 3:
         return
     var files: PackedStringArray = DirAccess.get_files_at(folder_path)
@@ -233,21 +268,22 @@ func _scan_roms(folder_path: String, games: Array, depth := 0) -> void:
         if filename.begins_with("."):
             continue
         var extension := filename.get_extension().to_lower()
-        var profile: Dictionary = profiles.get(extension, {})
         var full_path := folder_path.path_join(filename)
-        var supported := not profile.is_empty()
-        var game: Dictionary = {"id":"rom-" + full_path.sha256_text().left(12),"label":filename.get_basename().replace("_", " "),"subtitle":"%s • .%s" % [str(profile.get("system", "Unconfigured")), extension],"hint":"Cross launches this game" if supported else "Add an emulator profile to launch this ROM","mark":str(profile.get("mark", extension.to_upper().left(4))),"color":str(profile.get("color", "5e6470")),"type":"command" if supported else "unavailable","enabled":true}
+        var core := str(system.get("core", ""))
+        var core_available := not core.is_empty() and FileAccess.file_exists("/usr/lib64/libretro/" + core)
+        var supported := not system.is_empty() and core_available
+        var game: Dictionary = {"id":"rom-" + full_path.sha256_text().left(12),"label":filename.get_basename().replace("_", " "),"subtitle":"%s • .%s" % [str(system.get("label", "Unmapped ROM")), extension],"hint":"Cross launches this game" if supported else "This system's emulator is not installed yet","mark":str(system.get("mark", extension.to_upper().left(4))),"color":str(system.get("color", "5e6470")),"type":"command" if supported else "unavailable","enabled":true}
         if supported:
             game["executable"] = "/opt/hearth/launchers/retroarch-game.sh"
-            game["args"] = [str(profile.get("core", "")), full_path]
+            game["args"] = [core, full_path]
         else:
-            game["error"] = "Hearth found %s, but .%s needs an emulator profile in launcher/config/library-profiles.json before it can launch." % [filename, extension]
+            game["error"] = "Hearth found %s. %s is configured for %s, but the required core (%s) is not installed in /usr/lib64/libretro yet." % [filename, str(system.get("label", "this folder")), str(system.get("emulator_label", "RetroArch")), core if not core.is_empty() else "none"]
         games.append(game)
     var folders: PackedStringArray = DirAccess.get_directories_at(folder_path)
     folders.sort()
     for child in folders:
         if not child.begins_with("."):
-            _scan_roms(folder_path.path_join(child), games, depth + 1)
+            _scan_system_folder(folder_path.path_join(child), system, games, depth + 1)
 
 func _unhandled_input(event: InputEvent) -> void:
     if event.is_action_pressed("ui_cancel") or (event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_B):

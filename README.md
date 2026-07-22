@@ -4,7 +4,7 @@ Hearth is a controller-first, Linux-native living-room launcher. It provides a c
 
 ## Personal ROM library
 
-Add ROMs you are authorized to use under `/srv/library/games/roms/<system-folder>/`. Hearth scans system folders and three nested levels every time you open **Games**. Every file appears in the wheel; a file launches when its extension has a profile in `launcher/config/library-profiles.json` and the named Libretro core is installed in `/usr/lib64/libretro`.
+Add ROMs you are authorized to use under `/srv/library/games/roms/<system-folder>/`. Hearth scans system folders and three nested levels every time you open **Games**. It consolidates Game Boy variants and Sega branches, shows all era-appropriate system placeholders, and uses `launcher/config/system-registry.json` to bind each system to a Libretro core. A game launches only when that core is installed in `/usr/lib64/libretro`.
 
 ROMs, BIOS files, saves, personal media, credentials, logs, and Godot cache are ignored by Git and must never be committed.
 

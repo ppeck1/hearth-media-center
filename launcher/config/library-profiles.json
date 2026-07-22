@@ -1,9 +1,0 @@
-{
-  "schema_version": 1,
-  "extensions": {
-    "gb": {"system":"Game Boy","core":"mgba_libretro.so","mark":"GB","color":"5b8f78"},
-    "gbc": {"system":"Game Boy Color","core":"mgba_libretro.so","mark":"GBC","color":"4e8d89"},
-    "gba": {"system":"Game Boy Advance","core":"mgba_libretro.so","mark":"GBA","color":"7467a5"},
-    "nes": {"system":"Nintendo Entertainment System","core":"nestopia_libretro.so","mark":"NES","color":"b85b4f"}
-  }
-}
