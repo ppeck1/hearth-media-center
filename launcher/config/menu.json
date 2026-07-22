@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "title": "Good evening",
+  "title": "Home",
   "items": [
     {"id":"games","label":"Games","subtitle":"Browse your personal ROM library","hint":"Enter the Arcade Vault","mark":"PLAY","color":"426d8d","art":"res://assets/nav/games-panel-v1.svg","type":"library","enabled":true},
     {"id":"plex","label":"Plex","subtitle":"Your media","hint":"Open your local library","mark":"▶","color":"66518a","art":"res://assets/logos/plex.svg","type":"command","executable":"/opt/hearth/launchers/plex-htpc.sh","args":[],"enabled":true},

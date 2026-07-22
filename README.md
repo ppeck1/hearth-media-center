@@ -2,9 +2,19 @@
 
 Hearth Media Center is a controller-first, Linux-native interface for games, local media applications, PC gaming, and streaming services. It presents each destination as a cinematic floating carousel while leaving emulation and media playback to the applications designed for them.
 
+## Current interface
+
+### Home
+
 ![Hearth Media Center home screen](docs/images/home.png)
 
+The Home screen combines a live local clock with a clean, artwork-led carousel.
+
+### Streaming
+
 ![Hearth Media Center streaming screen](docs/images/streaming.png)
+
+Streaming services use the same controller-first carousel against a dedicated video-club backdrop.
 
 ## Highlights
 
