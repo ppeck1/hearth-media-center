@@ -225,6 +225,10 @@ func _library_systems() -> Array:
             buckets[str(system.get("id", ""))] = []
     var unknown: Dictionary = {}
     if DirAccess.dir_exists_absolute(LIBRARY_ROOT):
+        var loose_files: Array = []
+        _scan_system_folder(LIBRARY_ROOT, {}, loose_files, 0, false)
+        if not loose_files.is_empty():
+            unknown["Loose Files"] = loose_files
         var folders: PackedStringArray = DirAccess.get_directories_at(LIBRARY_ROOT)
         folders.sort()
         for folder in folders:
@@ -259,13 +263,13 @@ func _system_item(system: Dictionary, games: Array) -> Dictionary:
         games = [{"id":"empty-" + str(system.get("id", "system")),"label":"No ROMs added yet","subtitle":"Place files in /srv/library/games/roms/<folder>","hint":"This system is ready when you are","mark":"+","color":str(system.get("color", "426d8d")),"type":"unavailable","error":"No ROMs have been added to %s yet." % str(system.get("label", "this system")),"enabled":true}]
     return {"id":str(system.get("id", "system")),"label":str(system.get("label", "System")),"subtitle":"%d ROM%s • %s" % [count, "" if count == 1 else "s", str(system.get("emulator_label", "RetroArch"))],"hint":"Choose a ROM" if count > 0 else "Placeholder ready for your library","mark":str(system.get("mark", "•")),"color":str(system.get("color", "426d8d")),"type":"submenu","children":games,"enabled":true}
 
-func _scan_system_folder(folder_path: String, system: Dictionary, games: Array, depth := 0) -> void:
+func _scan_system_folder(folder_path: String, system: Dictionary, games: Array, depth := 0, scan_children := true) -> void:
     if depth > 3:
         return
     var files: PackedStringArray = DirAccess.get_files_at(folder_path)
     files.sort()
     for filename in files:
-        if filename.begins_with("."):
+        if filename.begins_with(".") or _is_library_metadata(filename):
             continue
         var extension := filename.get_extension().to_lower()
         var full_path := folder_path.path_join(filename)
@@ -279,11 +283,16 @@ func _scan_system_folder(folder_path: String, system: Dictionary, games: Array, 
         else:
             game["error"] = "Hearth found %s. %s is configured for %s, but the required core (%s) is not installed in /usr/lib64/libretro yet." % [filename, str(system.get("label", "this folder")), str(system.get("emulator_label", "RetroArch")), core if not core.is_empty() else "none"]
         games.append(game)
+    if not scan_children:
+        return
     var folders: PackedStringArray = DirAccess.get_directories_at(folder_path)
     folders.sort()
     for child in folders:
         if not child.begins_with("."):
             _scan_system_folder(folder_path.path_join(child), system, games, depth + 1)
+
+func _is_library_metadata(filename: String) -> bool:
+    return filename.get_extension().to_lower() in ["md", "txt", "nfo", "json", "xml", "jpg", "jpeg", "png", "webp"]
 
 func _unhandled_input(event: InputEvent) -> void:
     if event.is_action_pressed("ui_cancel") or (event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_B):
