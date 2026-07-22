@@ -1,0 +1,50 @@
+{
+  "schema_version": 2,
+  "default_profiles": {
+    "keyboard": "standard_remote",
+    "gamepad": "ps5"
+  },
+  "device_assignments": [],
+  "profiles": [
+    {
+      "id": "ps5",
+      "label": "PS5 DualSense",
+      "match": {
+        "name_contains": ["dualsense", "dualsense wireless controller"]
+      },
+      "bindings": {
+        "navigate_up": [{"control":"gamepad_button:dpad_up"}, {"control":"gamepad_axis:left_y", "direction":-1, "threshold":0.72}],
+        "navigate_down": [{"control":"gamepad_button:dpad_down"}, {"control":"gamepad_axis:left_y", "direction":1, "threshold":0.72}],
+        "navigate_left": [{"control":"gamepad_button:dpad_left"}, {"control":"gamepad_axis:left_x", "direction":-1, "threshold":0.72}],
+        "navigate_right": [{"control":"gamepad_button:dpad_right"}, {"control":"gamepad_axis:left_x", "direction":1, "threshold":0.72}],
+        "select": [{"control":"gamepad_button:south"}],
+        "back": [{"control":"gamepad_button:east"}],
+        "home": [{"control":"gamepad_button:guide"}],
+        "menu": [{"control":"gamepad_button:start"}],
+        "play_pause": [{"control":"gamepad_button:touchpad"}],
+        "page_left": [{"control":"gamepad_button:left_shoulder"}],
+        "page_right": [{"control":"gamepad_button:right_shoulder"}]
+      }
+    },
+    {
+      "id": "standard_remote",
+      "label": "Standard Remote",
+      "match": {
+        "keyboard_like": true
+      },
+      "bindings": {
+        "navigate_up": [{"control":"key:arrow_up"}],
+        "navigate_down": [{"control":"key:arrow_down"}],
+        "navigate_left": [{"control":"key:arrow_left"}],
+        "navigate_right": [{"control":"key:arrow_right"}],
+        "select": [{"control":"key:enter"}],
+        "back": [{"control":"key:escape"}],
+        "home": [{"control":"key:home"}],
+        "menu": [{"control":"key:menu"}],
+        "play_pause": [{"control":"key:media_play_pause"}],
+        "page_left": [{"control":"key:page_up"}],
+        "page_right": [{"control":"key:page_down"}]
+      }
+    }
+  ]
+}

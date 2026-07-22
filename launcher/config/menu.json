@@ -16,6 +16,7 @@
       {"id":"peacock","label":"Peacock","subtitle":"Sign-in required","mark":"P","color":"8e5576","art":"res://assets/logos/peacock-panel-v1.svg","type":"command","executable":"/opt/hearth/launchers/peacock.sh","args":[],"enabled":true}
     ]},
     {"id":"maintenance","label":"Maintenance","subtitle":"Desktop tools","hint":"For supervised maintenance only","mark":"TOOLS","color":"5e6470","art":"res://assets/nav/maintenance-panel-v1.svg","type":"command","executable":"/opt/hearth/launchers/maintenance-mode.sh","args":[],"enabled":true},
+    {"id":"settings","label":"Settings","subtitle":"Controllers and remotes","hint":"Configure input profiles","mark":"⚙","color":"62758f","type":"panel","panel_id":"input_settings","enabled":true},
     {"id":"system","label":"System","subtitle":"Power controls","hint":"Restart or shut down safely","mark":"I/O","color":"6d4c4c","art":"res://assets/nav/system-panel-v1.svg","type":"submenu","enabled":true,"children":[
       {"id":"restart","label":"Restart","subtitle":"Restart this PC","mark":"RE","color":"6d4c4c","type":"command","executable":"/opt/hearth/launchers/restart.sh","args":[],"enabled":true},
       {"id":"shutdown","label":"Shut Down","subtitle":"Power off this PC","mark":"OFF","color":"6d4c4c","type":"command","executable":"/opt/hearth/launchers/shutdown.sh","args":[],"enabled":true}

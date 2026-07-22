@@ -24,17 +24,7 @@ uniform float glow_width : hint_range(3.0, 28.0) = 10.0;
 uniform float tint_dark_shapes : hint_range(0.0, 1.0) = 0.0;
 uniform int cutout_mode = 0;
 
-vec3 key_color(sampler2D image) {
-    return (
-        texture(image, vec2(0.015, 0.015)).rgb +
-        texture(image, vec2(0.985, 0.015)).rgb +
-        texture(image, vec2(0.015, 0.985)).rgb +
-        texture(image, vec2(0.985, 0.985)).rgb
-    ) * 0.25;
-}
-
-float visible_alpha(sampler2D image, vec2 uv, vec3 background_key) {
-    vec4 pixel = texture(image, clamp(uv, vec2(0.0), vec2(1.0)));
+float visible_alpha(vec4 pixel, vec3 background_key) {
     if (cutout_mode == 0) {
         return pixel.a;
     }
@@ -46,25 +36,33 @@ float visible_alpha(sampler2D image, vec2 uv, vec3 background_key) {
     return pixel.a * smoothstep(0.09, 0.24, color_distance);
 }
 
-float neighbour_alpha(sampler2D image, vec2 uv, vec2 step_size, vec3 background_key) {
-    float alpha = 0.0;
-    alpha = max(alpha, visible_alpha(image, uv + vec2(step_size.x, 0.0), background_key));
-    alpha = max(alpha, visible_alpha(image, uv - vec2(step_size.x, 0.0), background_key));
-    alpha = max(alpha, visible_alpha(image, uv + vec2(0.0, step_size.y), background_key));
-    alpha = max(alpha, visible_alpha(image, uv - vec2(0.0, step_size.y), background_key));
-    alpha = max(alpha, visible_alpha(image, uv + step_size, background_key));
-    alpha = max(alpha, visible_alpha(image, uv - step_size, background_key));
-    alpha = max(alpha, visible_alpha(image, uv + vec2(step_size.x, -step_size.y), background_key));
-    alpha = max(alpha, visible_alpha(image, uv + vec2(-step_size.x, step_size.y), background_key));
-    return alpha;
-}
-
 void fragment() {
     vec4 pixel = texture(TEXTURE, UV);
-    vec3 background_key = key_color(TEXTURE);
-    float alpha = visible_alpha(TEXTURE, UV, background_key);
-    float outline_alpha = max(0.0, neighbour_alpha(TEXTURE, UV, TEXTURE_PIXEL_SIZE * outline_width, background_key) - alpha);
-    float glow_alpha = max(0.0, neighbour_alpha(TEXTURE, UV, TEXTURE_PIXEL_SIZE * glow_width, background_key) - alpha);
+    vec3 background_key = (
+        texture(TEXTURE, vec2(0.015, 0.015)).rgb +
+        texture(TEXTURE, vec2(0.985, 0.015)).rgb +
+        texture(TEXTURE, vec2(0.015, 0.985)).rgb +
+        texture(TEXTURE, vec2(0.985, 0.985)).rgb
+    ) * 0.25;
+    float alpha = visible_alpha(pixel, background_key);
+    vec2 outline_step = TEXTURE_PIXEL_SIZE * outline_width;
+    vec2 glow_step = TEXTURE_PIXEL_SIZE * glow_width;
+    float outline_neighbour = 0.0;
+    float glow_neighbour = 0.0;
+    for (int x = -1; x <= 1; x++) {
+        for (int y = -1; y <= 1; y++) {
+            if (x == 0 && y == 0) {
+                continue;
+            }
+            vec2 direction = vec2(float(x), float(y));
+            vec4 outline_pixel = texture(TEXTURE, clamp(UV + outline_step * direction, vec2(0.0), vec2(1.0)));
+            vec4 glow_pixel = texture(TEXTURE, clamp(UV + glow_step * direction, vec2(0.0), vec2(1.0)));
+            outline_neighbour = max(outline_neighbour, visible_alpha(outline_pixel, background_key));
+            glow_neighbour = max(glow_neighbour, visible_alpha(glow_pixel, background_key));
+        }
+    }
+    float outline_alpha = max(0.0, outline_neighbour - alpha);
+    float glow_alpha = max(0.0, glow_neighbour - alpha);
     float neon_alpha = max(outline_alpha * outline_strength, glow_alpha * glow_strength * 0.42);
     vec3 neon_rgb = outline_color.rgb * (1.1 + glow_strength * 0.25);
     float dark_shape = alpha * (1.0 - max(pixel.r, max(pixel.g, pixel.b))) * tint_dark_shapes;
@@ -99,8 +97,11 @@ var last_button: Button
 var card_phase := 0.0
 var card_tweens: Dictionary = {}
 var art_shader: Shader
+@onready var input_manager = $InputManager
+@onready var input_settings = $InputSettings
 
 func _ready() -> void:
+    input_settings.closed.connect(_on_input_settings_closed)
     _build_ui()
     _load_registry()
     _load_home()
@@ -214,6 +215,7 @@ func _show_menu(next_items: Array, title: String, path: String, focus_index := 0
     selected = 0
     heading.text = title
     breadcrumb.text = path
+    breadcrumb.visible = not stack.is_empty()
     _set_visual_mode(path.contains("MY LIBRARY"), next_items)
     for item in items:
         if typeof(item) == TYPE_DICTIONARY:
@@ -354,7 +356,7 @@ func _select(index: int, immediate := false) -> void:
     detail.text = str(focus_item.get("subtitle", ""))
     selection_label.text = "—  %s  —" % str(focus_item.get("hint", "Choose your next adventure"))
     arcade_fx.set_accent(Color(str(focus_item.get("color", "f2a93b"))))
-    footer.text = "D-PAD / LEFT STICK: BROWSE     X: SELECT     O: BACK     %s" % str(focus_item.get("hint", ""))
+    footer.text = "BROWSE     SELECT     BACK     %s" % str(focus_item.get("hint", ""))
     for card in buttons:
         var offset := _carousel_offset(int(card.get_meta("index", 0)), selected, buttons.size())
         var distance: int = absi(offset)
@@ -481,6 +483,13 @@ func _set_visual_mode(in_library: bool, next_items: Array) -> void:
 func _activate(item: Dictionary, card: Button) -> void:
     last_button = card
     var kind := str(item.get("type", ""))
+    if kind == "panel":
+        if str(item.get("panel_id", "")) == "input_settings":
+            input_settings.open_panel()
+            footer.text = "Input settings"
+        else:
+            _show_error("This settings panel is not available yet.")
+        return
     if kind == "library":
         var systems := _library_systems()
         if systems.is_empty():
@@ -595,19 +604,34 @@ func _is_library_metadata(filename: String) -> bool:
     return filename.get_extension().to_lower() in ["md", "txt", "nfo", "json", "xml", "jpg", "jpeg", "png", "webp"]
 
 func _unhandled_input(event: InputEvent) -> void:
-    if event.is_action_pressed("ui_cancel") or (event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_B):
+    if input_settings.visible:
+        input_settings.handle_unhandled_input(event)
+        get_viewport().set_input_as_handled()
+        return
+    if input_manager.action_pressed(event, "home") and not stack.is_empty():
+        stack.clear()
+        _load_home()
+        return
+    if input_manager.action_pressed(event, "back"):
         if modal.visible:
             modal.visible = false
         elif not stack.is_empty():
             var previous: Dictionary = stack.pop_back()
             _show_menu(previous["items"], previous["title"], previous["path"], int(previous["index"]))
         return
-    var left: bool = event.is_action_pressed("ui_left") or (event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_DPAD_LEFT) or (event is InputEventJoypadMotion and event.axis == JOY_AXIS_LEFT_X and event.axis_value < -0.72)
-    var right: bool = event.is_action_pressed("ui_right") or (event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_DPAD_RIGHT) or (event is InputEventJoypadMotion and event.axis == JOY_AXIS_LEFT_X and event.axis_value > 0.72)
+    var left: bool = input_manager.action_pressed(event, "navigate_left") or input_manager.action_pressed(event, "page_left")
+    var right: bool = input_manager.action_pressed(event, "navigate_right") or input_manager.action_pressed(event, "page_right")
     if left:
         _select(selected - 1)
     elif right:
         _select(selected + 1)
+    elif input_manager.action_pressed(event, "select") and selected >= 0 and selected < buttons.size():
+        _activate(buttons[selected].get_meta("item", {}), buttons[selected])
+
+func _on_input_settings_closed() -> void:
+    footer.text = "Returned to Hearth"
+    if is_instance_valid(last_button):
+        last_button.grab_focus()
 
 func _process(delta: float) -> void:
     card_phase += delta
