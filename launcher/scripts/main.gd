@@ -170,6 +170,17 @@ func _add_card(item: Dictionary) -> void:
     box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     box.add_theme_constant_override("separation", 10)
     card.add_child(box)
+    var brand := str(item.get("brand", ""))
+    if not brand.is_empty():
+        var brand_label := Label.new()
+        brand_label.text = brand
+        brand_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        brand_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        brand_label.add_theme_font_size_override("font_size", 16)
+        brand_label.add_theme_color_override("font_color", Color(accent, 1.0))
+        brand_label.add_theme_constant_override("outline_size", 3)
+        brand_label.add_theme_color_override("font_outline_color", Color(INK, 0.92))
+        box.add_child(brand_label)
     var art_path := str(item.get("art", ""))
     var art_texture: Texture2D = load(art_path) if not art_path.is_empty() else null
     if art_texture != null:
@@ -341,7 +352,7 @@ func _library_systems() -> Array:
                 family_systems.append(_system_item(system, games))
                 family_game_count += games.size()
         if not family_systems.is_empty():
-            family_items.append({"id":str(family.get("id", "family")),"label":str(family.get("label", "Systems")),"subtitle":"%d systems • %d game%s" % [family_systems.size(), family_game_count, "" if family_game_count == 1 else "s"],"count_label":"%d game%s" % [family_game_count, "" if family_game_count == 1 else "s"],"game_count":family_game_count,"hint":"Choose a system","mark":str(family.get("mark", "•")),"color":str(family.get("color", "426d8d")),"type":"submenu","children":family_systems,"enabled":true})
+            family_items.append({"id":str(family.get("id", "family")),"label":str(family.get("label", "Systems")),"brand":str(family.get("brand", "")),"art":str(family.get("art", "")),"subtitle":"%d systems • %d game%s" % [family_systems.size(), family_game_count, "" if family_game_count == 1 else "s"],"count_label":"%d game%s" % [family_game_count, "" if family_game_count == 1 else "s"],"game_count":family_game_count,"hint":"Choose a system","mark":str(family.get("mark", "•")),"color":str(family.get("color", "426d8d")),"type":"submenu","children":family_systems,"enabled":true})
     if not unknown.is_empty():
         var unknown_systems: Array = []
         var unmapped_game_count := 0

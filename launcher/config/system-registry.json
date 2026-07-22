@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
   "families": [
-    {"id":"nintendo","label":"Nintendo","mark":"N","color":"b84c4c"},
-    {"id":"sega","label":"Sega","mark":"S","color":"416f9f"},
-    {"id":"sony","label":"Sony","mark":"PS","color":"5f5b98"},
-    {"id":"nec","label":"NEC","mark":"NEC","color":"b16945"},
-    {"id":"atari","label":"Atari","mark":"AT","color":"86506c"},
-    {"id":"snk","label":"SNK","mark":"SNK","color":"53705d"},
-    {"id":"arcade","label":"Arcade","mark":"AR","color":"9a6b35"},
-    {"id":"other","label":"Other Classics","mark":"+","color":"5e6470"}
+    {"id":"nintendo","label":"Nintendo","brand":"NINTENDO","mark":"N","color":"b84c4c"},
+    {"id":"sega","label":"Sega","brand":"SEGA","art":"res://assets/brands/sega.svg","mark":"S","color":"416f9f"},
+    {"id":"sony","label":"Sony","brand":"SONY PLAYSTATION","art":"res://assets/brands/sony.svg","mark":"PS","color":"5f5b98"},
+    {"id":"nec","label":"NEC","brand":"NEC","mark":"NEC","color":"b16945"},
+    {"id":"atari","label":"Atari","brand":"ATARI","art":"res://assets/brands/atari.svg","mark":"AT","color":"86506c"},
+    {"id":"snk","label":"SNK","brand":"SNK // NEO GEO","mark":"SNK","color":"53705d"},
+    {"id":"arcade","label":"Arcade","brand":"ARCADE","mark":"AR","color":"9a6b35"},
+    {"id":"other","label":"Other Classics","brand":"CLASSICS","mark":"+","color":"5e6470"}
   ],
   "systems": [
     {"id":"gameboy","family":"nintendo","label":"Game Boy","aliases":["gb","gbc","gba","gameboy","game-boy","gameboy-color","gameboy-advance"],"core":"mgba_libretro.so","emulator_label":"RetroArch • mGBA","mark":"GB","color":"5b8f78"},
