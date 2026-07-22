@@ -1,21 +1,53 @@
-# Hearth Living Room
+# Hearth Media Center
 
-Hearth is a controller-first, Linux-native living-room launcher. It provides a cinematic system wheel for games, Plex, Steam, and streaming; RetroArch remains the emulator behind the interface rather than the interface itself.
+Hearth Media Center is a controller-first, Linux-native interface for games, local media applications, PC gaming, and streaming services. It presents each destination as a cinematic floating carousel while leaving emulation and media playback to the applications designed for them.
 
-## Personal ROM library
+![Hearth Media Center home screen](docs/images/home.png)
 
-Add ROMs you are authorized to use under `/srv/library/games/roms/<system-folder>/`. Hearth scans system folders and three nested levels every time you open **Games**. It consolidates Game Boy variants and Sega branches, shows all era-appropriate system placeholders, and uses `launcher/config/system-registry.json` to bind each system to a Libretro core. A game launches only when that core is installed in `/usr/lib64/libretro`.
+![Hearth Media Center streaming screen](docs/images/streaming.png)
 
-ROMs, BIOS files, saves, personal media, credentials, logs, and Godot cache are ignored by Git and must never be committed.
+## Highlights
 
-## DualSense controls
+- Controller-first navigation with keyboard recovery controls
+- Floating, wrap-around carousel with transparent artwork and neon focus cues
+- Automatic organization of locally configured game systems and collections
+- Launch-and-return integration for RetroArch, Steam Big Picture, Plex HTPC, and browser-based streaming services
+- Clear unavailable-state messages when an emulator core or launcher is not installed
+- Local-only application and library configuration
 
-- D-pad or left stick: browse
-- Cross: select
-- Circle: go back or dismiss a dialog
+## Controls
 
-USB and Bluetooth use the same standard gamepad mapping. Keyboard arrows, Enter, and Escape remain recovery controls.
+| Action | Controller | Keyboard |
+| --- | --- | --- |
+| Browse | D-pad or left stick | Arrow keys |
+| Select | Cross / south face button | Enter |
+| Back | Circle / east face button | Escape |
 
-## Status
+USB and Bluetooth controllers use the same standard gamepad mappings.
 
-This source tree is a review build. Do not deploy to the appliance until the failing system HDD is replaced with an SSD and launch/return testing is repeated.
+## Project structure
+
+- `launcher/` — Godot interface, configuration, and visual assets
+- `launchers/` — application and game-launch helper scripts
+- `verify/` — static project and privacy checks
+- `docs/` — project documentation and screenshots
+
+## Development
+
+The launcher targets Godot 4 on Linux. Open `launcher/project.godot` in Godot or run:
+
+```bash
+godot --path launcher
+```
+
+Run the repository checks before publishing or deploying changes:
+
+```bash
+./verify/verify-project.sh
+```
+
+## Privacy and repository boundaries
+
+This repository intentionally contains no ROMs, media-library inventory, BIOS or save data, credentials, browser profiles, cookies, account details, or login data. Private storage locations and application access are configured only on the machine running Hearth Media Center.
+
+Brand names and service marks belong to their respective owners and are used only to identify compatible destinations.

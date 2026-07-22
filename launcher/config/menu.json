@@ -2,23 +2,23 @@
   "schema_version": 2,
   "title": "Good evening",
   "items": [
-    {"id":"games","label":"Games","subtitle":"Browse your personal ROM library","hint":"Enter the Arcade Vault","mark":"✦","color":"426d8d","art":"res://assets/backgrounds/console-gallery-v1.png","art_fit":"cover","type":"library","enabled":true},
+    {"id":"games","label":"Games","subtitle":"Browse your personal ROM library","hint":"Enter the Arcade Vault","mark":"PLAY","color":"426d8d","type":"library","enabled":true},
     {"id":"plex","label":"Plex","subtitle":"Your media","hint":"Open your local library","mark":"▶","color":"66518a","art":"res://assets/logos/plex.svg","type":"command","executable":"/opt/hearth/launchers/plex-htpc.sh","args":[],"enabled":true},
     {"id":"steam","label":"Steam","subtitle":"Big Picture","hint":"Open your PC games","mark":"◉","color":"386d7f","art":"res://assets/logos/steam.svg","type":"command","executable":"/opt/hearth/launchers/steam-big-picture.sh","args":[],"enabled":true},
-    {"id":"streaming","label":"Streaming","subtitle":"Your services","hint":"Choose a service","mark":"▰","color":"77603a","type":"submenu","enabled":true,"children":[
+    {"id":"streaming","label":"Streaming","subtitle":"Your services","hint":"Choose a service","mark":"TV","color":"77603a","type":"submenu","enabled":true,"children":[
       {"id":"netflix","label":"Netflix","subtitle":"Sign-in required","mark":"N","color":"6b3140","art":"res://assets/logos/netflix.svg","type":"command","executable":"/opt/hearth/launchers/netflix.sh","args":[],"enabled":true},
-      {"id":"prime","label":"Prime Video","subtitle":"Sign-in required","mark":"P","color":"2f6d86","art":"res://assets/logos/primevideo.png","type":"command","executable":"/opt/hearth/launchers/prime-video.sh","args":[],"enabled":true},
+      {"id":"prime","label":"Prime Video","subtitle":"Sign-in required","mark":"P","color":"2f6d86","art":"res://assets/logos/primevideo-v2.svg","type":"command","executable":"/opt/hearth/launchers/prime-video.sh","args":[],"enabled":true},
       {"id":"apple-tv","label":"Apple TV+","subtitle":"Sign-in required","mark":"TV","color":"5d6774","art":"res://assets/logos/appletv.svg","type":"command","executable":"/opt/hearth/launchers/apple-tv.sh","args":[],"enabled":true},
-      {"id":"disney-plus","label":"Disney+","subtitle":"Sign-in required","mark":"D+","color":"31538d","art":"res://assets/logos/disneyplus.png","type":"command","executable":"/opt/hearth/launchers/disney-plus.sh","args":[],"enabled":true},
-      {"id":"hulu","label":"Hulu","subtitle":"Sign-in required","mark":"H","color":"3f8d63","art":"res://assets/logos/hulu.png","type":"command","executable":"/opt/hearth/launchers/hulu.sh","args":[],"enabled":true},
+      {"id":"disney-plus","label":"Disney+","subtitle":"Sign-in required","mark":"D+","color":"31538d","art":"res://assets/logos/disneyplus-v2.svg","type":"command","executable":"/opt/hearth/launchers/disney-plus.sh","args":[],"enabled":true},
+      {"id":"hulu","label":"Hulu","subtitle":"Sign-in required","mark":"H","color":"3f8d63","art":"res://assets/logos/hulu-v2.svg","type":"command","executable":"/opt/hearth/launchers/hulu.sh","args":[],"enabled":true},
       {"id":"max","label":"Max","subtitle":"Sign-in required","mark":"M","color":"504b9a","art":"res://assets/logos/max.svg","type":"command","executable":"/opt/hearth/launchers/max.sh","args":[],"enabled":true},
       {"id":"paramount-plus","label":"Paramount+","subtitle":"Sign-in required","mark":"P+","color":"37609c","art":"res://assets/logos/paramountplus.svg","type":"command","executable":"/opt/hearth/launchers/paramount-plus.sh","args":[],"enabled":true},
-      {"id":"peacock","label":"Peacock","subtitle":"Sign-in required","mark":"●","color":"8e5576","art":"res://assets/logos/peacock.png","type":"command","executable":"/opt/hearth/launchers/peacock.sh","args":[],"enabled":true}
+      {"id":"peacock","label":"Peacock","subtitle":"Sign-in required","mark":"P","color":"8e5576","art":"res://assets/logos/peacock-v2.svg","type":"command","executable":"/opt/hearth/launchers/peacock.sh","args":[],"enabled":true}
     ]},
-    {"id":"maintenance","label":"Maintenance","subtitle":"Desktop tools","hint":"For supervised maintenance only","mark":"⚙","color":"5e6470","type":"command","executable":"/opt/hearth/launchers/maintenance-mode.sh","args":[],"enabled":true},
-    {"id":"system","label":"System","subtitle":"Power controls","hint":"Restart or shut down safely","mark":"⏻","color":"6d4c4c","type":"submenu","enabled":true,"children":[
-      {"id":"restart","label":"Restart","subtitle":"Restart this PC","mark":"↻","color":"6d4c4c","type":"command","executable":"/opt/hearth/launchers/restart.sh","args":[],"enabled":true},
-      {"id":"shutdown","label":"Shut Down","subtitle":"Power off this PC","mark":"⏻","color":"6d4c4c","type":"command","executable":"/opt/hearth/launchers/shutdown.sh","args":[],"enabled":true}
+    {"id":"maintenance","label":"Maintenance","subtitle":"Desktop tools","hint":"For supervised maintenance only","mark":"TOOLS","color":"5e6470","type":"command","executable":"/opt/hearth/launchers/maintenance-mode.sh","args":[],"enabled":true},
+    {"id":"system","label":"System","subtitle":"Power controls","hint":"Restart or shut down safely","mark":"I/O","color":"6d4c4c","type":"submenu","enabled":true,"children":[
+      {"id":"restart","label":"Restart","subtitle":"Restart this PC","mark":"RE","color":"6d4c4c","type":"command","executable":"/opt/hearth/launchers/restart.sh","args":[],"enabled":true},
+      {"id":"shutdown","label":"Shut Down","subtitle":"Power off this PC","mark":"OFF","color":"6d4c4c","type":"command","executable":"/opt/hearth/launchers/shutdown.sh","args":[],"enabled":true}
     ]}
   ]
 }

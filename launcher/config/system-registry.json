@@ -1,21 +1,21 @@
 {
   "schema_version": 1,
   "families": [
-    {"id":"nintendo","label":"Nintendo","brand":"NINTENDO","mark":"N","color":"b84c4c"},
+    {"id":"nintendo","label":"Nintendo","brand":"NINTENDO","art":"res://assets/brands/nintendo-wordmark-v1.svg","mark":"N","color":"b84c4c"},
     {"id":"sega","label":"Sega","brand":"SEGA","art":"res://assets/brands/sega.svg","mark":"S","color":"416f9f"},
     {"id":"sony","label":"Sony","brand":"SONY PLAYSTATION","art":"res://assets/brands/sony.svg","mark":"PS","color":"5f5b98"},
-    {"id":"nec","label":"NEC","brand":"NEC","mark":"NEC","color":"b16945"},
+    {"id":"nec","label":"NEC","brand":"NEC","art":"res://assets/brands/nec-wordmark-v1.svg","mark":"NEC","color":"b16945"},
     {"id":"atari","label":"Atari","brand":"ATARI","art":"res://assets/brands/atari.svg","mark":"AT","color":"86506c"},
-    {"id":"snk","label":"SNK","brand":"SNK // NEO GEO","mark":"SNK","color":"53705d"},
-    {"id":"arcade","label":"Arcade","brand":"ARCADE","mark":"AR","color":"9a6b35"},
-    {"id":"other","label":"Other Classics","brand":"CLASSICS","mark":"+","color":"5e6470"}
+    {"id":"snk","label":"SNK","brand":"SNK // NEO GEO","art":"res://assets/brands/snk-wordmark-v1.svg","mark":"SNK","color":"53705d"},
+    {"id":"arcade","label":"Arcade","brand":"ARCADE","art":"res://assets/brands/arcade-wordmark-v1.svg","mark":"AR","color":"9a6b35"},
+    {"id":"other","label":"Other Classics","brand":"CLASSICS","art":"res://assets/brands/classics-wordmark-v1.svg","mark":"+","color":"5e6470"}
   ],
   "systems": [
-    {"id":"gameboy","family":"nintendo","label":"Game Boy","aliases":["gb","gbc","gba","gameboy","game-boy","gameboy-color","gameboy-advance"],"core":"mgba_libretro.so","emulator_label":"RetroArch • mGBA","art":"res://assets/systems/game-boy-neon-v1.png","mark":"GB","color":"5b8f78"},
-    {"id":"nes","family":"nintendo","label":"Nintendo Entertainment System","aliases":["nes","famicom"],"core":"nestopia_libretro.so","emulator_label":"RetroArch • Nestopia","art":"res://assets/systems/nes-neon-v1.png","mark":"NES","color":"b85b4f"},
+    {"id":"gameboy","family":"nintendo","label":"Game Boy","aliases":["gb","gbc","gba","gameboy","game-boy","gameboy-color","gameboy-advance"],"core":"mgba_libretro.so","emulator_label":"RetroArch • mGBA","art":"res://assets/systems/game-boy-cutout-v2.png","mark":"GB","color":"5b8f78"},
+    {"id":"nes","family":"nintendo","label":"Nintendo Entertainment System","aliases":["nes","famicom"],"core":"nestopia_libretro.so","emulator_label":"RetroArch • Nestopia","art":"res://assets/systems/nes-cutout-v2.png","mark":"NES","color":"b85b4f"},
     {"id":"snes","family":"nintendo","label":"Super Nintendo","aliases":["snes","super-nintendo","super-famicom"],"core":"snes9x_libretro.so","emulator_label":"RetroArch • Snes9x","mark":"SNES","color":"6d5e9f"},
-    {"id":"n64","family":"nintendo","label":"Nintendo 64","aliases":["n64","nintendo64"],"core":"mupen64plus_next_libretro.so","emulator_label":"RetroArch • Mupen64Plus-Next","art":"res://assets/systems/n64-neon-v1.png","mark":"N64","color":"4d8b5e"},
-    {"id":"gamecube","family":"nintendo","label":"Nintendo GameCube","aliases":["gamecube","gc"],"core":"dolphin_libretro.so","emulator_label":"RetroArch • Dolphin","art":"res://assets/systems/gamecube-neon-v1.png","mark":"GC","color":"6552a4"},
+    {"id":"n64","family":"nintendo","label":"Nintendo 64","aliases":["n64","nintendo64"],"core":"mupen64plus_next_libretro.so","emulator_label":"RetroArch • Mupen64Plus-Next","art":"res://assets/systems/n64-cutout-v2.png","mark":"N64","color":"4d8b5e"},
+    {"id":"gamecube","family":"nintendo","label":"Nintendo GameCube","aliases":["gamecube","gc"],"core":"dolphin_libretro.so","emulator_label":"RetroArch • Dolphin","art":"res://assets/systems/gamecube-cutout-v2.png","mark":"GC","color":"6552a4"},
     {"id":"master-system","family":"sega","label":"Master System","aliases":["mastersystem","master-system","sms"],"core":"genesis_plus_gx_libretro.so","emulator_label":"RetroArch • Genesis Plus GX","mark":"MS","color":"416f9f"},
     {"id":"genesis","family":"sega","label":"Genesis / Mega Drive","aliases":["genesis","megadrive","mega-drive","md"],"core":"genesis_plus_gx_libretro.so","emulator_label":"RetroArch • Genesis Plus GX","art":"res://assets/systems/genesis-neon-v1.png","mark":"MD","color":"416f9f"},
     {"id":"sega-cd","family":"sega","label":"Sega CD","aliases":["segacd","sega-cd","mega-cd","megacd"],"core":"genesis_plus_gx_libretro.so","emulator_label":"RetroArch • Genesis Plus GX","mark":"CD","color":"416f9f"},

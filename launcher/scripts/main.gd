@@ -8,11 +8,71 @@ const MUTED := Color("aeb9c8")
 const MENU_PATH := "res://config/menu.json"
 const REGISTRY_PATH := "res://config/system-registry.json"
 const LIBRARY_ROOT := "/srv/library/games/roms"
-const HOME_BACKGROUND := preload("res://assets/backgrounds/arcade-living-room-v1.png")
+const HOME_BACKGROUND := preload("res://assets/backgrounds/arcade-living-room-v2.png")
 const ARCADE_BACKGROUND_PATH := "res://assets/backgrounds/arcade-attract-v1.png"
 const VIDEO_CLUB_BACKGROUND_PATH := "res://assets/backgrounds/video-club-aisle-v1.png"
-const CONSOLE_GALLERY_BACKGROUND_PATH := "res://assets/backgrounds/console-gallery-v1.png"
+const CONSOLE_GALLERY_BACKGROUND_PATH := "res://assets/backgrounds/arcade-living-room-v2.png"
 const ArcadeFx := preload("res://scripts/arcade_fx.gd")
+const ART_SHADER_CODE := """
+shader_type canvas_item;
+
+uniform vec4 outline_color : source_color = vec4(0.95, 0.66, 0.23, 1.0);
+uniform float outline_strength : hint_range(0.0, 1.5) = 0.75;
+uniform float glow_strength : hint_range(0.0, 1.5) = 0.45;
+uniform float outline_width : hint_range(1.0, 12.0) = 3.0;
+uniform float glow_width : hint_range(3.0, 28.0) = 10.0;
+uniform float tint_dark_shapes : hint_range(0.0, 1.0) = 0.0;
+uniform int cutout_mode = 0;
+
+vec3 key_color(sampler2D image) {
+    return (
+        texture(image, vec2(0.015, 0.015)).rgb +
+        texture(image, vec2(0.985, 0.015)).rgb +
+        texture(image, vec2(0.015, 0.985)).rgb +
+        texture(image, vec2(0.985, 0.985)).rgb
+    ) * 0.25;
+}
+
+float visible_alpha(sampler2D image, vec2 uv, vec3 background_key) {
+    vec4 pixel = texture(image, clamp(uv, vec2(0.0), vec2(1.0)));
+    if (cutout_mode == 0) {
+        return pixel.a;
+    }
+    if (cutout_mode == 2) {
+        float lightness = max(pixel.r, max(pixel.g, pixel.b));
+        return pixel.a * smoothstep(0.42, 0.76, lightness);
+    }
+    float color_distance = distance(pixel.rgb, background_key);
+    return pixel.a * smoothstep(0.09, 0.24, color_distance);
+}
+
+float neighbour_alpha(sampler2D image, vec2 uv, vec2 step_size, vec3 background_key) {
+    float alpha = 0.0;
+    alpha = max(alpha, visible_alpha(image, uv + vec2(step_size.x, 0.0), background_key));
+    alpha = max(alpha, visible_alpha(image, uv - vec2(step_size.x, 0.0), background_key));
+    alpha = max(alpha, visible_alpha(image, uv + vec2(0.0, step_size.y), background_key));
+    alpha = max(alpha, visible_alpha(image, uv - vec2(0.0, step_size.y), background_key));
+    alpha = max(alpha, visible_alpha(image, uv + step_size, background_key));
+    alpha = max(alpha, visible_alpha(image, uv - step_size, background_key));
+    alpha = max(alpha, visible_alpha(image, uv + vec2(step_size.x, -step_size.y), background_key));
+    alpha = max(alpha, visible_alpha(image, uv + vec2(-step_size.x, step_size.y), background_key));
+    return alpha;
+}
+
+void fragment() {
+    vec4 pixel = texture(TEXTURE, UV);
+    vec3 background_key = key_color(TEXTURE);
+    float alpha = visible_alpha(TEXTURE, UV, background_key);
+    float outline_alpha = max(0.0, neighbour_alpha(TEXTURE, UV, TEXTURE_PIXEL_SIZE * outline_width, background_key) - alpha);
+    float glow_alpha = max(0.0, neighbour_alpha(TEXTURE, UV, TEXTURE_PIXEL_SIZE * glow_width, background_key) - alpha);
+    float neon_alpha = max(outline_alpha * outline_strength, glow_alpha * glow_strength * 0.42);
+    vec3 neon_rgb = outline_color.rgb * (1.1 + glow_strength * 0.25);
+    float dark_shape = alpha * (1.0 - max(pixel.r, max(pixel.g, pixel.b))) * tint_dark_shapes;
+    vec3 result_rgb = mix(pixel.rgb, neon_rgb, clamp(neon_alpha * 1.7 + dark_shape * 0.92, 0.0, 1.0));
+    float result_alpha = max(alpha, neon_alpha);
+    COLOR = vec4(result_rgb, result_alpha * COLOR.a);
+}
+"""
 
 var background: TextureRect
 var veil: ColorRect
@@ -38,6 +98,7 @@ var child_pid := -1
 var last_button: Button
 var card_phase := 0.0
 var card_tweens: Dictionary = {}
+var art_shader: Shader
 
 func _ready() -> void:
     _build_ui()
@@ -45,6 +106,8 @@ func _ready() -> void:
     _load_home()
 
 func _build_ui() -> void:
+    art_shader = Shader.new()
+    art_shader.code = ART_SHADER_CODE
     background = TextureRect.new()
     background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     background.texture = HOME_BACKGROUND
@@ -166,17 +229,19 @@ func _add_card(item: Dictionary) -> void:
     card.disabled = not bool(item.get("enabled", true))
     card.clip_contents = false
     var accent := Color(str(item.get("color", "426d8d")))
-    var base := Color(SLATE, 0.93).lerp(Color(accent, 0.94), 0.32)
-    card.add_theme_stylebox_override("normal", _box(base, Color(accent, 0.78), 2, 22, Color(accent, 0.20), 15))
-    card.add_theme_stylebox_override("focus", _box(Color(base, 1.0), AMBER, 6, 22, Color(accent, 0.52), 34))
-    card.add_theme_stylebox_override("hover", _box(Color(base, 1.0), Color(accent, 1.0), 5, 22, Color(accent, 0.42), 26))
+    var empty_style := StyleBoxEmpty.new()
+    card.add_theme_stylebox_override("normal", empty_style)
+    card.add_theme_stylebox_override("focus", empty_style)
+    card.add_theme_stylebox_override("hover", empty_style)
+    card.add_theme_stylebox_override("pressed", empty_style)
+    card.add_theme_stylebox_override("disabled", empty_style)
     card.pressed.connect(_activate.bind(item, card))
     card.focus_entered.connect(_focus_card.bind(card))
     stage.add_child(card)
     var visual_root := Control.new()
     visual_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     visual_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-    visual_root.clip_contents = true
+    visual_root.clip_contents = false
     card.add_child(visual_root)
     card.set_meta("visual_root", visual_root)
 
@@ -190,6 +255,7 @@ func _add_card(item: Dictionary) -> void:
     visual_root.add_child(inset)
     var box := VBoxContainer.new()
     box.add_theme_constant_override("separation", 5)
+    box.alignment = BoxContainer.ALIGNMENT_CENTER
     box.mouse_filter = Control.MOUSE_FILTER_IGNORE
     inset.add_child(box)
     var brand := str(item.get("brand", ""))
@@ -218,11 +284,21 @@ func _add_card(item: Dictionary) -> void:
         art.custom_minimum_size = Vector2(0, 118)
         art.size_flags_vertical = Control.SIZE_EXPAND_FILL
         art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-        art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED if str(item.get("art_fit", "contain")) == "cover" else TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-        art.modulate = Color(1.0, 1.0, 1.0, 0.96)
+        art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+        art.modulate = Color(1.0, 1.0, 1.0, 1.0)
         art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        var art_material := ShaderMaterial.new()
+        art_material.shader = art_shader
+        art_material.set_shader_parameter("outline_color", accent)
+        art_material.set_shader_parameter("cutout_mode", _cutout_mode_for_art(art_path))
+        art_material.set_shader_parameter("tint_dark_shapes", 1.0 if art_path.ends_with(".svg") else 0.0)
+        art_material.set_shader_parameter("outline_width", 8.0 if art_path.contains("cutout") else 3.0)
+        art_material.set_shader_parameter("glow_width", 20.0 if art_path.contains("cutout") else 9.0)
+        art.material = art_material
         box.add_child(art)
         card.set_meta("art_node", art)
+        card.set_meta("art_material", art_material)
+        card.set_meta("is_cutout", art_path.contains("cutout"))
     else:
         var mark := Label.new()
         mark.text = str(item.get("mark", "•"))
@@ -231,10 +307,11 @@ func _add_card(item: Dictionary) -> void:
         mark.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
         mark.add_theme_font_size_override("font_size", 86)
         mark.add_theme_color_override("font_color", Color(accent, 1.0))
-        mark.add_theme_constant_override("outline_size", 5)
-        mark.add_theme_color_override("font_outline_color", Color(INK, 0.95))
+        mark.add_theme_constant_override("outline_size", 12)
+        mark.add_theme_color_override("font_outline_color", Color(accent, 0.34))
         box.add_child(mark)
         card.set_meta("art_node", mark)
+        card.set_meta("mark_node", mark)
     var name := Label.new()
     name.text = str(item.get("label", "Item"))
     name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -254,28 +331,17 @@ func _add_card(item: Dictionary) -> void:
         box.add_child(count)
         card.set_meta("count_label_node", count)
 
-    # Fine horizontal phosphor lines give every card a shared CRT-era finish.
-    # They are deliberately subtle so logos and game art remain legible.
-    for line_index in range(9):
-        var scanline := ColorRect.new()
-        scanline.color = Color(0.20, 0.90, 1.0, 0.030)
-        scanline.set_anchors_preset(Control.PRESET_TOP_WIDE)
-        scanline.anchor_top = 0.10 + float(line_index) * 0.105
-        scanline.anchor_bottom = scanline.anchor_top
-        scanline.offset_bottom = 1.0
-        scanline.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        visual_root.add_child(scanline)
-
-    var neon_rail := ColorRect.new()
-    neon_rail.color = Color(accent, 0.72)
-    neon_rail.set_anchors_preset(Control.PRESET_TOP_WIDE)
-    neon_rail.offset_left = 20
-    neon_rail.offset_right = -20
-    neon_rail.offset_top = 8
-    neon_rail.offset_bottom = 11
-    neon_rail.mouse_filter = Control.MOUSE_FILTER_IGNORE
-    visual_root.add_child(neon_rail)
+    card.set_meta("accent", accent)
     buttons.append(card)
+
+func _cutout_mode_for_art(art_path: String) -> int:
+    if art_path.contains("cutout"):
+        return 0
+    if art_path.ends_with("disneyplus.png"):
+        return 2
+    if art_path.ends_with(".png"):
+        return 1
+    return 0
 
 func _focus_card(card: Button) -> void:
     _select(int(card.get_meta("index", 0)))
@@ -283,24 +349,24 @@ func _focus_card(card: Button) -> void:
 func _select(index: int, immediate := false) -> void:
     if buttons.is_empty():
         return
-    selected = clampi(index, 0, buttons.size() - 1)
+    selected = posmod(index, buttons.size())
     var focus_item: Dictionary = buttons[selected].get_meta("item", {})
     detail.text = str(focus_item.get("subtitle", ""))
     selection_label.text = "—  %s  —" % str(focus_item.get("hint", "Choose your next adventure"))
     arcade_fx.set_accent(Color(str(focus_item.get("color", "f2a93b"))))
     footer.text = "D-PAD / LEFT STICK: BROWSE     X: SELECT     O: BACK     %s" % str(focus_item.get("hint", ""))
     for card in buttons:
-        var offset: int = int(card.get_meta("index", 0)) - selected
+        var offset := _carousel_offset(int(card.get_meta("index", 0)), selected, buttons.size())
         var distance: int = absi(offset)
         var previous_tween: Tween = card_tweens.get(card)
         if previous_tween != null and previous_tween.is_valid():
             previous_tween.kill()
-        var show_card := distance <= 1
+        var show_card := distance <= 2
         if not show_card:
             # Stage hidden cards just beyond the screen. A newly revealed
             # neighbour now glides in from the rail instead of expanding from
             # Godot's zero-size, top-left default state.
-            var staged_size := Vector2(226.0, 172.0)
+            var staged_size := Vector2(210.0, 176.0)
             var staged_center_x := -160.0 if offset < 0 else 2080.0
             card.size = staged_size
             card.position = Vector2(staged_center_x - staged_size.x * 0.5, 600.0 - staged_size.y * 0.5)
@@ -315,14 +381,14 @@ func _select(index: int, immediate := false) -> void:
         var size_value: Vector2
         var center_x := 960.0
         if selected_card:
-            size_value = Vector2(520, 352)
+            size_value = Vector2(520, 370)
         elif distance == 1:
-            size_value = Vector2(292, 220)
-            center_x += float(offset) * 490.0
+            size_value = Vector2(300, 238)
+            center_x += float(offset) * 480.0
         else:
-            size_value = Vector2(226, 172)
-            center_x += float(offset) * 800.0
-        var center_y := 572.0 + float(distance) * 14.0
+            size_value = Vector2(210, 176)
+            center_x += float(offset) * 392.5
+        var center_y := 575.0 + float(distance) * 12.0
         var position_value := Vector2(center_x - size_value.x * 0.5, center_y - size_value.y * 0.5)
         var rotation_value := 0.0 if selected_card else float(offset) * -0.018
         card.pivot_offset = size_value * 0.5
@@ -332,15 +398,26 @@ func _select(index: int, immediate := false) -> void:
             card.position = position_value
             card.size = size_value
             card.rotation = rotation_value
-            card.modulate.a = 1.0 if selected_card else 0.64
+            card.modulate.a = 1.0 if selected_card else 0.70 if distance == 1 else 0.42
         else:
             var tween := create_tween().set_parallel(true).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
             card_tweens[card] = tween
             tween.tween_property(card, "position", position_value, 0.24)
             tween.tween_property(card, "size", size_value, 0.24)
             tween.tween_property(card, "rotation", rotation_value, 0.22)
-            tween.tween_property(card, "modulate:a", 1.0 if selected_card else 0.58 if distance == 1 else 0.36, 0.18)
+            tween.tween_property(card, "modulate:a", 1.0 if selected_card else 0.70 if distance == 1 else 0.42, 0.18)
     buttons[selected].grab_focus()
+
+func _carousel_offset(card_index: int, focus_index: int, item_count: int) -> int:
+    var offset := card_index - focus_index
+    if item_count <= 1:
+        return offset
+    var half := item_count / 2.0
+    if float(offset) > half:
+        offset -= item_count
+    elif float(offset) < -half:
+        offset += item_count
+    return offset
 
 func _set_card_typography(card: Button, selected_card: bool, distance: int) -> void:
     var name_label: Label = card.get_meta("name_label", null)
@@ -355,8 +432,21 @@ func _set_card_typography(card: Button, selected_card: bool, distance: int) -> v
         count_label_node.add_theme_font_size_override("font_size", 18 if selected_card else 14 if distance == 1 else 12)
     var art_node: Control = card.get_meta("art_node", null)
     if art_node != null:
-        art_node.custom_minimum_size.y = 180.0 if selected_card and brand_label != null else 205.0 if selected_card else 105.0 if distance == 1 else 74.0
-        art_node.modulate.a = 1.0 if selected_card else 0.86 if distance == 1 else 0.64
+        var is_cutout := bool(card.get_meta("is_cutout", false))
+        art_node.custom_minimum_size.y = 270.0 if selected_card and is_cutout else 205.0 if selected_card else 160.0 if distance == 1 and is_cutout else 130.0 if distance == 1 else 110.0 if is_cutout else 88.0
+        art_node.modulate.a = 1.0 if selected_card else 0.90 if distance == 1 else 0.72
+    var accent: Color = card.get_meta("accent", AMBER)
+    var art_material: ShaderMaterial = card.get_meta("art_material") if card.has_meta("art_material") else null
+    if art_material != null:
+        art_material.set_shader_parameter("outline_color", AMBER if selected_card else accent)
+        art_material.set_shader_parameter("outline_strength", 1.05 if selected_card else 0.62 if distance == 1 else 0.38)
+        art_material.set_shader_parameter("glow_strength", 0.38 if selected_card else 0.18 if distance == 1 else 0.08)
+    var mark_node: Label = card.get_meta("mark_node") if card.has_meta("mark_node") else null
+    if mark_node != null:
+        var long_mark := mark_node.text.length() > 2
+        mark_node.add_theme_font_size_override("font_size", 58 if selected_card and long_mark else 108 if selected_card else 42 if distance == 1 and long_mark else 72 if distance == 1 else 30 if long_mark else 50)
+        mark_node.add_theme_constant_override("outline_size", 18 if selected_card else 11 if distance == 1 else 7)
+        mark_node.add_theme_color_override("font_outline_color", Color(AMBER if selected_card else accent, 0.78 if selected_card else 0.42))
 
 func _set_visual_mode(in_library: bool, next_items: Array) -> void:
     var in_streaming := breadcrumb.text.to_upper().contains("STREAMING")
@@ -367,7 +457,7 @@ func _set_visual_mode(in_library: bool, next_items: Array) -> void:
         background.texture = load(ARCADE_BACKGROUND_PATH) if breadcrumb.text.ends_with("MY LIBRARY") else load(CONSOLE_GALLERY_BACKGROUND_PATH)
     else:
         background.texture = HOME_BACKGROUND
-    veil.color = Color(INK, 0.47 if showcase_mode else 0.60)
+    veil.color = Color(INK, 0.42 if showcase_mode else 0.34)
     arcade_fx.set_arcade_mode(showcase_mode)
     collection_label.visible = showcase_mode
     selection_label.visible = showcase_mode
@@ -471,7 +561,7 @@ func _library_systems() -> Array:
 func _system_item(system: Dictionary, games: Array) -> Dictionary:
     var count := games.size()
     var art_path := str(system.get("art", ""))
-    return {"id":str(system.get("id", "system")),"label":str(system.get("label", "System")),"subtitle":"%d game%s • %s" % [count, "" if count == 1 else "s", str(system.get("emulator_label", "RetroArch"))],"count_label":"%d game%s" % [count, "" if count == 1 else "s"],"game_count":count,"art":art_path,"art_fit":"cover" if not art_path.is_empty() else "contain","hint":"Choose a game","mark":str(system.get("mark", "•")),"color":str(system.get("color", "426d8d")),"type":"submenu","children":games,"enabled":true}
+    return {"id":str(system.get("id", "system")),"label":str(system.get("label", "System")),"subtitle":"%d game%s • %s" % [count, "" if count == 1 else "s", str(system.get("emulator_label", "RetroArch"))],"count_label":"%d game%s" % [count, "" if count == 1 else "s"],"game_count":count,"art":art_path,"art_fit":"contain","hint":"Choose a game","mark":str(system.get("mark", "•")),"color":str(system.get("color", "426d8d")),"type":"submenu","children":games,"enabled":true}
 
 func _scan_system_folder(folder_path: String, system: Dictionary, games: Array, depth := 0, scan_children := true) -> void:
     if depth > 3:
