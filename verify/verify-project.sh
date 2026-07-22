@@ -8,10 +8,28 @@ jq -e '.families | all(has("art") and (.art | type == "string" and length > 0))'
 jq -e '.schema_version == 2 and (.profiles | length == 2) and (.device_assignments | type == "array") and ([.profiles[].id] | contains(["ps5", "standard_remote"]))' "${root}/launcher/config/input-profiles-defaults.json" >/dev/null
 jq -e '.schema_version == 1 and .adapters.steam == "native" and .adapters.retroarch == "native"' "${root}/launcher/config/app-input-policy.json" >/dev/null
 jq -e '.schema_version == 1 and .adapters.keyboard_navigation.outputs.home == "bridge:return_to_hearth"' "${root}/launcher/config/input-adapters.json" >/dev/null
+jq -e --slurpfile menu "${root}/launcher/config/menu.json" '
+  .destinations as $destinations |
+  ($menu[0].items[] | select(.id == "streaming").children | all(.id as $id | $destinations | has($id))) and
+  ($destinations.plex == "plex")
+' "${root}/launcher/config/app-input-policy.json" >/dev/null
 for launcher in "${root}"/launchers/*.sh; do
   bash -n "${launcher}"
   test -x "${launcher}"
 done
+bash -n "${root}/deploy/fedora/install-input-access.sh"
+test -x "${root}/deploy/fedora/install-input-access.sh"
+test -f "${root}/deploy/fedora/69-hearth-uinput.rules"
+test -f "${root}/deploy/fedora/hearth-uinput.conf"
+rg -q 'TAG\+="uaccess"' "${root}/deploy/fedora/69-hearth-uinput.rules"
+if rg -q -e 'MODE="?0?666' -e 'GROUP="input"' "${root}/deploy/fedora/69-hearth-uinput.rules"; then
+  printf '%s\n' 'Unsafe uinput permissions found.' >&2
+  exit 1
+fi
+test -x "${root}/launchers/run-with-input-bridge.sh"
+rg -q 'run-with-input-bridge.sh.*destination_id' "${root}/launchers/browser-service.sh"
+rg -q 'browser-service.sh prime-video .* prime$' "${root}/launchers/prime-video.sh"
+rg -q 'run-with-input-bridge.sh plex' "${root}/launchers/plex-htpc.sh"
 for module in \
   scripts/input/input_actions.gd \
   scripts/input/input_event_codec.gd \
@@ -22,6 +40,11 @@ for module in \
   tests/input_smoke.gd; do
   test -f "${root}/launcher/${module}"
 done
+for module in evdev_source.py uinput_sink.py process_runner.py; do
+  test -f "${root}/input_bridge/hearth_input_bridge/${module}"
+done
+test -f "${root}/input_bridge/tests/test_linux_runtime.py"
+python3 -m compileall -q "${root}/input_bridge"
 PYTHONPATH="${root}" python3 -m unittest discover -s "${root}/input_bridge/tests"
 if command -v godot >/dev/null 2>&1; then
   godot --headless --path "${root}/launcher" --import

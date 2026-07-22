@@ -48,6 +48,18 @@ class BridgeConfigTests(unittest.TestCase):
             with self.assertRaises(ConfigError):
                 BridgeConfig.load(CONFIG_DIR, user_config=temporary)
 
+    def test_live_runtime_can_fall_back_from_malformed_saved_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            temporary = Path(directory) / "malformed-profile.json"
+            temporary.write_text("{not valid json", encoding="utf-8")
+            config = BridgeConfig.load(
+                CONFIG_DIR,
+                user_config=temporary,
+                fallback_invalid_user=True,
+            )
+            self.assertEqual(config.profile("ps5")["id"], "ps5")
+            self.assertEqual(len(config.warnings), 1)
+
     def test_rejects_backend_specific_godot_keycodes(self) -> None:
         config = BridgeConfig.load(CONFIG_DIR, user_config=REPO_ROOT / "does-not-exist.json")
         broken = json.loads(json.dumps(config.profiles))

@@ -35,19 +35,34 @@ class BridgeConfig:
     profiles: dict[str, Any]
     policy: dict[str, Any]
     adapters: dict[str, Any]
+    warnings: tuple[str, ...] = ()
 
     @classmethod
-    def load(cls, config_dir: Path, user_config: Path | None = None) -> "BridgeConfig":
+    def load(
+        cls,
+        config_dir: Path,
+        user_config: Path | None = None,
+        *,
+        fallback_invalid_user: bool = False,
+    ) -> "BridgeConfig":
         defaults = _read_json(config_dir / "input-profiles-defaults.json")
         policy = _read_json(config_dir / "app-input-policy.json")
         adapters = _read_json(config_dir / "input-adapters.json")
         profiles = defaults
+        warnings: list[str] = []
         candidate = user_config or default_user_profile_path()
         if candidate.is_file():
-            profiles = _merge_profiles(defaults, _read_json(candidate))
+            try:
+                profiles = _merge_profiles(defaults, _read_json(candidate))
+                _validate_profiles(profiles)
+            except ConfigError as error:
+                if not fallback_invalid_user:
+                    raise
+                profiles = defaults
+                warnings.append(f"ignored invalid saved input profile {candidate}: {error}")
         _validate_profiles(profiles)
         _validate_policy(policy, adapters)
-        return cls(profiles=profiles, policy=policy, adapters=adapters)
+        return cls(profiles=profiles, policy=policy, adapters=adapters, warnings=tuple(warnings))
 
     def profile(self, profile_id: str) -> dict[str, Any]:
         for profile in self.profiles["profiles"]:
@@ -122,6 +137,23 @@ def _validate_profiles(data: dict[str, Any]) -> None:
         bindings = profile.get("bindings")
         if not isinstance(bindings, dict):
             raise ConfigError(f"Profile {profile['id']} has no bindings")
+        match = profile.get("match", {})
+        if not isinstance(match, dict):
+            raise ConfigError(f"Profile {profile['id']} has malformed device matching")
+        name_contains = match.get("name_contains", [])
+        if not isinstance(name_contains, list) or any(not isinstance(value, str) or not value for value in name_contains):
+            raise ConfigError(f"Profile {profile['id']} has malformed device names")
+        evdev_match = match.get("evdev", {})
+        if not isinstance(evdev_match, dict):
+            raise ConfigError(f"Profile {profile['id']} has malformed evdev matching")
+        vendor_id = evdev_match.get("vendor_id")
+        product_ids = evdev_match.get("product_ids", [])
+        if vendor_id is not None and (not isinstance(vendor_id, int) or isinstance(vendor_id, bool) or not 0 <= vendor_id <= 0xFFFF):
+            raise ConfigError(f"Profile {profile['id']} has an invalid evdev vendor id")
+        if not isinstance(product_ids, list) or any(
+            not isinstance(value, int) or isinstance(value, bool) or not 0 <= value <= 0xFFFF for value in product_ids
+        ):
+            raise ConfigError(f"Profile {profile['id']} has invalid evdev product ids")
         if set(bindings) != ACTIONS:
             raise ConfigError(f"Profile {profile['id']} must define exactly the canonical action set")
         for action, action_bindings in bindings.items():
@@ -189,3 +221,31 @@ def _validate_policy(policy: dict[str, Any], adapters: dict[str, Any]) -> None:
             raise ConfigError(f"Policy {policy_id} references unknown adapter {adapter_id}")
     if any(policy_id not in policy_adapters for policy_id in destinations.values()):
         raise ConfigError("A destination references an unknown policy")
+    for adapter_id, definition in adapter_definitions.items():
+        if not isinstance(definition, dict):
+            raise ConfigError(f"Adapter {adapter_id} is malformed")
+        outputs = definition.get("outputs", {})
+        overrides = definition.get("destination_overrides", {})
+        if not isinstance(outputs, dict) or not isinstance(overrides, dict):
+            raise ConfigError(f"Adapter {adapter_id} outputs are malformed")
+        if any(action not in ACTIONS for action in outputs):
+            raise ConfigError(f"Adapter {adapter_id} references an unknown semantic action")
+        for output in outputs.values():
+            _validate_adapter_output(output)
+        for destination_id, destination_outputs in overrides.items():
+            if destination_id not in destinations or not isinstance(destination_outputs, dict):
+                raise ConfigError(f"Adapter {adapter_id} has an invalid destination override")
+            if any(action not in ACTIONS for action in destination_outputs):
+                raise ConfigError(f"Adapter {adapter_id} override references an unknown semantic action")
+            for output in destination_outputs.values():
+                _validate_adapter_output(output)
+
+
+def _validate_adapter_output(output: Any) -> None:
+    if output == "bridge:return_to_hearth":
+        return
+    if not isinstance(output, str) or not output.startswith("key:"):
+        raise ConfigError("Adapter outputs must be allowlisted keys or bridge:return_to_hearth")
+    key = output.removeprefix("key:")
+    if key not in CANONICAL_KEYS and not (len(key) == 1 and key.isascii() and key.isalnum()):
+        raise ConfigError(f"Unsupported adapter output: {output}")
