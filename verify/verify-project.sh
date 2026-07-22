@@ -6,10 +6,14 @@ jq -e '.schema_version == 1 and (.families | type == "array") and (.systems | ty
 jq -e '.families | all(has("art") and (.art | type == "string" and length > 0))' "${root}/launcher/config/system-registry.json" >/dev/null
 bash -n "${root}/launchers/retroarch-game.sh"
 test -x "${root}/launchers/retroarch-game.sh"
-test -f "${root}/launcher/assets/backgrounds/arcade-living-room-v2.png"
+test -f "${root}/launcher/assets/backgrounds/arcade-living-room-v3.png"
 while IFS= read -r art_path; do
   test -f "${root}/launcher/${art_path#res://}"
 done < <(jq -r '.. | objects | .art? // empty' "${root}/launcher/config/menu.json" "${root}/launcher/config/system-registry.json")
+if rg -n -e '<image' -e 'data:image' "${root}/launcher/assets/logos/"*'-panel-v1.svg'; then
+  printf '%s\n' 'Raster content found in a streaming panel.' >&2
+  exit 1
+fi
 home_marker="/home""/p""a""u""l"
 name_marker="p""a""u""l"
 account_marker="p""p""e""c""k""1"
