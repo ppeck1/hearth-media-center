@@ -1,0 +1,19 @@
+{
+  "schema_version": 2,
+  "title": "Good evening",
+  "items": [
+    {"id":"games","label":"Games","subtitle":"Browse your personal ROM library","hint":"Add ROMs under /srv/library/games/roms","mark":"✦","color":"426d8d","type":"library","enabled":true},
+    {"id":"plex","label":"Plex","subtitle":"Your media","hint":"Open your local library","mark":"▶","color":"66518a","type":"command","executable":"/opt/hearth/launchers/plex-htpc.sh","args":[],"enabled":true},
+    {"id":"steam","label":"Steam","subtitle":"Big Picture","hint":"Open your PC games","mark":"◉","color":"386d7f","type":"command","executable":"/opt/hearth/launchers/steam-big-picture.sh","args":[],"enabled":true},
+    {"id":"streaming","label":"Streaming","subtitle":"Your services","hint":"Choose a service","mark":"▰","color":"77603a","type":"submenu","enabled":true,"children":[
+      {"id":"youtube","label":"YouTube","subtitle":"Web player","mark":"▶","color":"8a3434","type":"command","executable":"/opt/hearth/launchers/youtube.sh","args":[],"enabled":true},
+      {"id":"netflix","label":"Netflix","subtitle":"Sign-in required","mark":"N","color":"6b3140","type":"command","executable":"/opt/hearth/launchers/netflix.sh","args":[],"enabled":true},
+      {"id":"prime","label":"Prime Video","subtitle":"Sign-in required","mark":"P","color":"2f6d86","type":"command","executable":"/opt/hearth/launchers/prime-video.sh","args":[],"enabled":true}
+    ]},
+    {"id":"maintenance","label":"Maintenance","subtitle":"Desktop tools","hint":"For supervised maintenance only","mark":"⚙","color":"5e6470","type":"command","executable":"/opt/hearth/launchers/maintenance-mode.sh","args":[],"enabled":true},
+    {"id":"system","label":"System","subtitle":"Power controls","hint":"Restart or shut down safely","mark":"⏻","color":"6d4c4c","type":"submenu","enabled":true,"children":[
+      {"id":"restart","label":"Restart","subtitle":"Restart this PC","mark":"↻","color":"6d4c4c","type":"command","executable":"/opt/hearth/launchers/restart.sh","args":[],"enabled":true},
+      {"id":"shutdown","label":"Shut Down","subtitle":"Power off this PC","mark":"⏻","color":"6d4c4c","type":"command","executable":"/opt/hearth/launchers/shutdown.sh","args":[],"enabled":true}
+    ]}
+  ]
+}
