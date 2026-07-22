@@ -154,6 +154,13 @@ func _add_card(item: Dictionary) -> void:
     name.add_theme_font_size_override("font_size", 30)
     name.add_theme_color_override("font_color", PAPER)
     box.add_child(name)
+    if item.has("count_label"):
+        var count := Label.new()
+        count.text = str(item.get("count_label", ""))
+        count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        count.add_theme_font_size_override("font_size", 20)
+        count.add_theme_color_override("font_color", AMBER)
+        box.add_child(count)
     buttons.append(card)
 
 func _focus_card(card: Button) -> void:
@@ -193,7 +200,7 @@ func _activate(item: Dictionary, card: Button) -> void:
     if kind == "library":
         var systems := _library_systems()
         if systems.is_empty():
-            _show_error("No ROM folders found. Add a system folder under /srv/library/games/roms, then reopen Games.")
+            _show_error("No ROMs found. Add game files under /srv/library/games/roms, then reopen Games.")
             return
         stack.append({"items":items,"title":heading.text,"path":breadcrumb.text,"index":selected})
         _show_menu(systems, "My Library", breadcrumb.text + "  ›  MY LIBRARY")
@@ -236,8 +243,10 @@ func _library_systems() -> Array:
                 continue
             var mapped: Dictionary = folder_aliases.get(folder.to_lower(), {})
             if mapped.is_empty():
-                unknown[folder] = []
-                _scan_system_folder(LIBRARY_ROOT.path_join(folder), {}, unknown[folder])
+                var unknown_games: Array = []
+                _scan_system_folder(LIBRARY_ROOT.path_join(folder), {}, unknown_games)
+                if not unknown_games.is_empty():
+                    unknown[folder] = unknown_games
             else:
                 _scan_system_folder(LIBRARY_ROOT.path_join(folder), mapped, buckets[str(mapped.get("id", ""))])
     var family_items: Array = []
@@ -245,23 +254,29 @@ func _library_systems() -> Array:
         if typeof(family) != TYPE_DICTIONARY:
             continue
         var family_systems: Array = []
+        var family_game_count := 0
         for system in systems:
             if typeof(system) == TYPE_DICTIONARY and str(system.get("family", "")) == str(family.get("id", "")):
-                family_systems.append(_system_item(system, buckets.get(str(system.get("id", "")), [])))
+                var games: Array = buckets.get(str(system.get("id", "")), [])
+                if games.is_empty():
+                    continue
+                family_systems.append(_system_item(system, games))
+                family_game_count += games.size()
         if not family_systems.is_empty():
-            family_items.append({"id":str(family.get("id", "family")),"label":str(family.get("label", "Systems")),"subtitle":"%d systems" % family_systems.size(),"hint":"Choose a system","mark":str(family.get("mark", "•")),"color":str(family.get("color", "426d8d")),"type":"submenu","children":family_systems,"enabled":true})
+            family_items.append({"id":str(family.get("id", "family")),"label":str(family.get("label", "Systems")),"subtitle":"%d systems • %d game%s" % [family_systems.size(), family_game_count, "" if family_game_count == 1 else "s"],"count_label":"%d game%s" % [family_game_count, "" if family_game_count == 1 else "s"],"hint":"Choose a system","mark":str(family.get("mark", "•")),"color":str(family.get("color", "426d8d")),"type":"submenu","children":family_systems,"enabled":true})
     if not unknown.is_empty():
         var unknown_systems: Array = []
+        var unmapped_game_count := 0
         for folder in unknown:
-            unknown_systems.append({"id":"unmapped-" + str(folder),"label":str(folder).replace("_", " ").replace("-", " ").capitalize(),"subtitle":"%d ROM%s • emulator not assigned" % [unknown[folder].size(), "" if unknown[folder].size() == 1 else "s"],"hint":"Add this folder to system-registry.json","mark":"?","color":"5e6470","type":"submenu","children":unknown[folder],"enabled":true})
-        family_items.append({"id":"unmapped","label":"Unmapped Library","subtitle":"Folders without a system profile","hint":"Nothing is hidden","mark":"?","color":"5e6470","type":"submenu","children":unknown_systems,"enabled":true})
+            var unknown_game_count: int = unknown[folder].size()
+            unmapped_game_count += unknown_game_count
+            unknown_systems.append({"id":"unmapped-" + str(folder),"label":str(folder).replace("_", " ").replace("-", " ").capitalize(),"subtitle":"%d game%s • emulator not assigned" % [unknown_game_count, "" if unknown_game_count == 1 else "s"],"count_label":"%d game%s" % [unknown_game_count, "" if unknown_game_count == 1 else "s"],"hint":"Add this folder to system-registry.json","mark":"?","color":"5e6470","type":"submenu","children":unknown[folder],"enabled":true})
+        family_items.append({"id":"unmapped","label":"Unmapped Library","subtitle":"%d folders • %d game%s" % [unknown_systems.size(), unmapped_game_count, "" if unmapped_game_count == 1 else "s"],"count_label":"%d game%s" % [unmapped_game_count, "" if unmapped_game_count == 1 else "s"],"hint":"Nothing is hidden","mark":"?","color":"5e6470","type":"submenu","children":unknown_systems,"enabled":true})
     return family_items
 
 func _system_item(system: Dictionary, games: Array) -> Dictionary:
     var count := games.size()
-    if count == 0:
-        games = [{"id":"empty-" + str(system.get("id", "system")),"label":"No ROMs added yet","subtitle":"Place files in /srv/library/games/roms/<folder>","hint":"This system is ready when you are","mark":"+","color":str(system.get("color", "426d8d")),"type":"unavailable","error":"No ROMs have been added to %s yet." % str(system.get("label", "this system")),"enabled":true}]
-    return {"id":str(system.get("id", "system")),"label":str(system.get("label", "System")),"subtitle":"%d ROM%s • %s" % [count, "" if count == 1 else "s", str(system.get("emulator_label", "RetroArch"))],"hint":"Choose a ROM" if count > 0 else "Placeholder ready for your library","mark":str(system.get("mark", "•")),"color":str(system.get("color", "426d8d")),"type":"submenu","children":games,"enabled":true}
+    return {"id":str(system.get("id", "system")),"label":str(system.get("label", "System")),"subtitle":"%d game%s • %s" % [count, "" if count == 1 else "s", str(system.get("emulator_label", "RetroArch"))],"count_label":"%d game%s" % [count, "" if count == 1 else "s"],"hint":"Choose a game","mark":str(system.get("mark", "•")),"color":str(system.get("color", "426d8d")),"type":"submenu","children":games,"enabled":true}
 
 func _scan_system_folder(folder_path: String, system: Dictionary, games: Array, depth := 0, scan_children := true) -> void:
     if depth > 3:
