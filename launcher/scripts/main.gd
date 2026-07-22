@@ -36,6 +36,8 @@ var folder_aliases: Dictionary = {}
 var selected := 0
 var child_pid := -1
 var last_button: Button
+var card_phase := 0.0
+var card_tweens: Dictionary = {}
 
 func _ready() -> void:
     _build_ui()
@@ -138,6 +140,10 @@ func _load_home() -> void:
     _show_menu(parsed["items"], str(parsed.get("title", "Welcome home")), "HEARTH  •  LIVING ROOM")
 
 func _show_menu(next_items: Array, title: String, path: String, focus_index := 0) -> void:
+    for tween in card_tweens.values():
+        if tween is Tween and tween.is_valid():
+            tween.kill()
+    card_tweens.clear()
     for child in stage.get_children():
         child.queue_free()
     items = next_items
@@ -158,6 +164,7 @@ func _add_card(item: Dictionary) -> void:
     card.set_meta("item", item)
     card.focus_mode = Control.FOCUS_ALL
     card.disabled = not bool(item.get("enabled", true))
+    card.clip_contents = false
     var accent := Color(str(item.get("color", "426d8d")))
     var base := Color(SLATE, 0.93).lerp(Color(accent, 0.94), 0.32)
     card.add_theme_stylebox_override("normal", _box(base, Color(accent, 0.78), 2, 22, Color(accent, 0.20), 15))
@@ -166,10 +173,25 @@ func _add_card(item: Dictionary) -> void:
     card.pressed.connect(_activate.bind(item, card))
     card.focus_entered.connect(_focus_card.bind(card))
     stage.add_child(card)
+    var visual_root := Control.new()
+    visual_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    visual_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    visual_root.clip_contents = true
+    card.add_child(visual_root)
+    card.set_meta("visual_root", visual_root)
+
+    var inset := MarginContainer.new()
+    inset.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    inset.add_theme_constant_override("margin_left", 22)
+    inset.add_theme_constant_override("margin_top", 18)
+    inset.add_theme_constant_override("margin_right", 22)
+    inset.add_theme_constant_override("margin_bottom", 18)
+    inset.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    visual_root.add_child(inset)
     var box := VBoxContainer.new()
-    box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    box.add_theme_constant_override("separation", 10)
-    card.add_child(box)
+    box.add_theme_constant_override("separation", 5)
+    box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    inset.add_child(box)
     var brand := str(item.get("brand", ""))
     if not brand.is_empty():
         var brand_label := Label.new()
@@ -181,16 +203,26 @@ func _add_card(item: Dictionary) -> void:
         brand_label.add_theme_constant_override("outline_size", 3)
         brand_label.add_theme_color_override("font_outline_color", Color(INK, 0.92))
         box.add_child(brand_label)
+        card.set_meta("brand_label", brand_label)
     var art_path := str(item.get("art", ""))
     var art_texture: Texture2D = load(art_path) if not art_path.is_empty() else null
     if art_texture != null:
+        var art_region: Array = item.get("art_region", [])
+        if art_region.size() == 4:
+            var atlas_texture := AtlasTexture.new()
+            atlas_texture.atlas = art_texture
+            atlas_texture.region = Rect2(float(art_region[0]), float(art_region[1]), float(art_region[2]), float(art_region[3]))
+            art_texture = atlas_texture
         var art := TextureRect.new()
         art.texture = art_texture
-        art.custom_minimum_size = Vector2(0, 104)
+        art.custom_minimum_size = Vector2(0, 118)
+        art.size_flags_vertical = Control.SIZE_EXPAND_FILL
         art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-        art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+        art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED if str(item.get("art_fit", "contain")) == "cover" else TextureRect.STRETCH_KEEP_ASPECT_CENTERED
         art.modulate = Color(1.0, 1.0, 1.0, 0.96)
+        art.mouse_filter = Control.MOUSE_FILTER_IGNORE
         box.add_child(art)
+        card.set_meta("art_node", art)
     else:
         var mark := Label.new()
         mark.text = str(item.get("mark", "•"))
@@ -202,6 +234,7 @@ func _add_card(item: Dictionary) -> void:
         mark.add_theme_constant_override("outline_size", 5)
         mark.add_theme_color_override("font_outline_color", Color(INK, 0.95))
         box.add_child(mark)
+        card.set_meta("art_node", mark)
     var name := Label.new()
     name.text = str(item.get("label", "Item"))
     name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -211,6 +244,7 @@ func _add_card(item: Dictionary) -> void:
     name.add_theme_constant_override("outline_size", 3)
     name.add_theme_color_override("font_outline_color", Color(INK, 0.88))
     box.add_child(name)
+    card.set_meta("name_label", name)
     if item.has("count_label"):
         var count := Label.new()
         count.text = str(item.get("count_label", ""))
@@ -218,6 +252,29 @@ func _add_card(item: Dictionary) -> void:
         count.add_theme_font_size_override("font_size", 20)
         count.add_theme_color_override("font_color", AMBER)
         box.add_child(count)
+        card.set_meta("count_label_node", count)
+
+    # Fine horizontal phosphor lines give every card a shared CRT-era finish.
+    # They are deliberately subtle so logos and game art remain legible.
+    for line_index in range(9):
+        var scanline := ColorRect.new()
+        scanline.color = Color(0.20, 0.90, 1.0, 0.030)
+        scanline.set_anchors_preset(Control.PRESET_TOP_WIDE)
+        scanline.anchor_top = 0.10 + float(line_index) * 0.105
+        scanline.anchor_bottom = scanline.anchor_top
+        scanline.offset_bottom = 1.0
+        scanline.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        visual_root.add_child(scanline)
+
+    var neon_rail := ColorRect.new()
+    neon_rail.color = Color(accent, 0.72)
+    neon_rail.set_anchors_preset(Control.PRESET_TOP_WIDE)
+    neon_rail.offset_left = 20
+    neon_rail.offset_right = -20
+    neon_rail.offset_top = 8
+    neon_rail.offset_bottom = 11
+    neon_rail.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    visual_root.add_child(neon_rail)
     buttons.append(card)
 
 func _focus_card(card: Button) -> void:
@@ -229,29 +286,77 @@ func _select(index: int, immediate := false) -> void:
     selected = clampi(index, 0, buttons.size() - 1)
     var focus_item: Dictionary = buttons[selected].get_meta("item", {})
     detail.text = str(focus_item.get("subtitle", ""))
-    selection_label.text = "✦  %s  ✦" % str(focus_item.get("hint", "Choose your next adventure"))
+    selection_label.text = "—  %s  —" % str(focus_item.get("hint", "Choose your next adventure"))
     arcade_fx.set_accent(Color(str(focus_item.get("color", "f2a93b"))))
-    footer.text = "D-pad / left stick: browse     ✕: select     ○: back     %s" % str(focus_item.get("hint", ""))
+    footer.text = "D-PAD / LEFT STICK: BROWSE     X: SELECT     O: BACK     %s" % str(focus_item.get("hint", ""))
     for card in buttons:
         var offset: int = int(card.get_meta("index", 0)) - selected
         var distance: int = absi(offset)
-        card.visible = distance <= 3
-        if not card.visible:
+        var previous_tween: Tween = card_tweens.get(card)
+        if previous_tween != null and previous_tween.is_valid():
+            previous_tween.kill()
+        var show_card := distance <= 1
+        if not show_card:
+            # Stage hidden cards just beyond the screen. A newly revealed
+            # neighbour now glides in from the rail instead of expanding from
+            # Godot's zero-size, top-left default state.
+            var staged_size := Vector2(226.0, 172.0)
+            var staged_center_x := -160.0 if offset < 0 else 2080.0
+            card.size = staged_size
+            card.position = Vector2(staged_center_x - staged_size.x * 0.5, 600.0 - staged_size.y * 0.5)
+            card.pivot_offset = staged_size * 0.5
+            card.rotation = 0.0
+            card.modulate.a = 0.0
+            card.visible = false
+            _set_card_typography(card, false, distance)
             continue
+        card.visible = true
         var selected_card: bool = offset == 0
-        var size_value: Vector2 = Vector2(560, 390) if selected_card else Vector2(330 - mini(distance - 1, 2) * 34, 246 - mini(distance - 1, 2) * 28)
-        var position_value := Vector2(960 + offset * 312 - size_value.x * 0.5, 560 - size_value.y * 0.5)
+        var size_value: Vector2
+        var center_x := 960.0
+        if selected_card:
+            size_value = Vector2(520, 352)
+        elif distance == 1:
+            size_value = Vector2(292, 220)
+            center_x += float(offset) * 490.0
+        else:
+            size_value = Vector2(226, 172)
+            center_x += float(offset) * 800.0
+        var center_y := 572.0 + float(distance) * 14.0
+        var position_value := Vector2(center_x - size_value.x * 0.5, center_y - size_value.y * 0.5)
+        var rotation_value := 0.0 if selected_card else float(offset) * -0.018
+        card.pivot_offset = size_value * 0.5
         card.z_index = 10 - distance
+        _set_card_typography(card, selected_card, distance)
         if immediate:
             card.position = position_value
             card.size = size_value
+            card.rotation = rotation_value
             card.modulate.a = 1.0 if selected_card else 0.64
         else:
-            var tween := create_tween().set_parallel(true).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-            tween.tween_property(card, "position", position_value, 0.16)
-            tween.tween_property(card, "size", size_value, 0.16)
-            tween.tween_property(card, "modulate:a", 1.0 if selected_card else 0.64, 0.14)
+            var tween := create_tween().set_parallel(true).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+            card_tweens[card] = tween
+            tween.tween_property(card, "position", position_value, 0.24)
+            tween.tween_property(card, "size", size_value, 0.24)
+            tween.tween_property(card, "rotation", rotation_value, 0.22)
+            tween.tween_property(card, "modulate:a", 1.0 if selected_card else 0.58 if distance == 1 else 0.36, 0.18)
     buttons[selected].grab_focus()
+
+func _set_card_typography(card: Button, selected_card: bool, distance: int) -> void:
+    var name_label: Label = card.get_meta("name_label", null)
+    if name_label != null:
+        name_label.add_theme_font_size_override("font_size", 28 if selected_card else 22 if distance == 1 else 17)
+    var brand_label: Label = card.get_meta("brand_label") if card.has_meta("brand_label") else null
+    if brand_label != null:
+        brand_label.visible = selected_card
+        brand_label.add_theme_font_size_override("font_size", 16 if selected_card else 12)
+    var count_label_node: Label = card.get_meta("count_label_node") if card.has_meta("count_label_node") else null
+    if count_label_node != null:
+        count_label_node.add_theme_font_size_override("font_size", 18 if selected_card else 14 if distance == 1 else 12)
+    var art_node: Control = card.get_meta("art_node", null)
+    if art_node != null:
+        art_node.custom_minimum_size.y = 180.0 if selected_card and brand_label != null else 205.0 if selected_card else 105.0 if distance == 1 else 74.0
+        art_node.modulate.a = 1.0 if selected_card else 0.86 if distance == 1 else 0.64
 
 func _set_visual_mode(in_library: bool, next_items: Array) -> void:
     var in_streaming := breadcrumb.text.to_upper().contains("STREAMING")
@@ -365,7 +470,8 @@ func _library_systems() -> Array:
 
 func _system_item(system: Dictionary, games: Array) -> Dictionary:
     var count := games.size()
-    return {"id":str(system.get("id", "system")),"label":str(system.get("label", "System")),"subtitle":"%d game%s • %s" % [count, "" if count == 1 else "s", str(system.get("emulator_label", "RetroArch"))],"count_label":"%d game%s" % [count, "" if count == 1 else "s"],"game_count":count,"hint":"Choose a game","mark":str(system.get("mark", "•")),"color":str(system.get("color", "426d8d")),"type":"submenu","children":games,"enabled":true}
+    var art_path := str(system.get("art", ""))
+    return {"id":str(system.get("id", "system")),"label":str(system.get("label", "System")),"subtitle":"%d game%s • %s" % [count, "" if count == 1 else "s", str(system.get("emulator_label", "RetroArch"))],"count_label":"%d game%s" % [count, "" if count == 1 else "s"],"game_count":count,"art":art_path,"art_fit":"cover" if not art_path.is_empty() else "contain","hint":"Choose a game","mark":str(system.get("mark", "•")),"color":str(system.get("color", "426d8d")),"type":"submenu","children":games,"enabled":true}
 
 func _scan_system_folder(folder_path: String, system: Dictionary, games: Array, depth := 0, scan_children := true) -> void:
     if depth > 3:
@@ -413,7 +519,25 @@ func _unhandled_input(event: InputEvent) -> void:
     elif right:
         _select(selected + 1)
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+    card_phase += delta
+    for card in buttons:
+        if not is_instance_valid(card) or not card.visible:
+            continue
+        var visual_root: Control = card.get_meta("visual_root", null)
+        if visual_root == null:
+            continue
+        visual_root.pivot_offset = card.size * 0.5
+        var is_selected := int(card.get_meta("index", -1)) == selected
+        if is_selected:
+            var breathe := 1.0 + sin(card_phase * 2.25) * 0.008
+            visual_root.scale = Vector2.ONE * breathe
+            visual_root.rotation = sin(card_phase * 1.35) * 0.0035
+            visual_root.position.y = sin(card_phase * 1.75) * 2.5
+        else:
+            visual_root.scale = visual_root.scale.lerp(Vector2.ONE, minf(1.0, delta * 9.0))
+            visual_root.rotation = lerpf(visual_root.rotation, 0.0, minf(1.0, delta * 9.0))
+            visual_root.position.y = lerpf(visual_root.position.y, 0.0, minf(1.0, delta * 9.0))
     if child_pid > 0 and not OS.is_process_running(child_pid):
         child_pid = -1
         footer.text = "Returned home safely"
