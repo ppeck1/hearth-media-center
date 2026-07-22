@@ -8,7 +8,8 @@ const MUTED := Color("aeb9c8")
 const MENU_PATH := "res://config/menu.json"
 const REGISTRY_PATH := "res://config/system-registry.json"
 const LIBRARY_ROOT := "/srv/library/games/roms"
-const HOME_BACKGROUND := preload("res://assets/backgrounds/arcade-living-room-v3.png")
+const HOME_MENU_PATH := "HEARTH  •  LIVING ROOM"
+const HOME_BACKGROUND := preload("res://assets/backgrounds/arcade-living-room-v4.png")
 const ARCADE_BACKGROUND_PATH := "res://assets/backgrounds/arcade-attract-v1.png"
 const VIDEO_CLUB_BACKGROUND_PATH := "res://assets/backgrounds/video-club-aisle-v1.png"
 const CONSOLE_GALLERY_BACKGROUND_PATH := "res://assets/backgrounds/console-gallery-v1.png"
@@ -79,10 +80,8 @@ var veil: ColorRect
 var arcade_fx: Control
 var stage: Control
 var heading: Label
-var breadcrumb: Label
 var detail: Label
 var footer: Label
-var marquee: Label
 var collection_label: Label
 var selection_label: Label
 var modal: PanelContainer
@@ -99,6 +98,8 @@ var last_button: Button
 var card_phase := 0.0
 var card_tweens: Dictionary = {}
 var art_shader: Shader
+var current_menu_title := ""
+var current_menu_path := ""
 
 func _ready() -> void:
     _build_ui()
@@ -122,23 +123,17 @@ func _build_ui() -> void:
     add_child(veil)
     arcade_fx = ArcadeFx.new()
     add_child(arcade_fx)
-    marquee = _label(Vector2(92, 28), Vector2(1120, 30), 18, AMBER)
-    marquee.text = "HEARTH  //  LIVING ROOM"
-    marquee.add_theme_constant_override("outline_size", 4)
-    marquee.add_theme_color_override("font_outline_color", Color(INK, 0.92))
-    add_child(marquee)
     collection_label = _label(Vector2(1240, 28), Vector2(580, 30), 18, PAPER)
     collection_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
     collection_label.visible = false
     collection_label.add_theme_constant_override("outline_size", 4)
     collection_label.add_theme_color_override("font_outline_color", Color(INK, 0.92))
     add_child(collection_label)
-    breadcrumb = _label(Vector2(92, 58), Vector2(1700, 28), 18, AMBER)
-    add_child(breadcrumb)
-    heading = _label(Vector2(88, 86), Vector2(1740, 72), 58, PAPER)
+    heading = _label(Vector2(88, 86), Vector2(760, 72), 58, PAPER)
     add_child(heading)
     heading.add_theme_constant_override("outline_size", 8)
     heading.add_theme_color_override("font_outline_color", Color(INK, 0.85))
+    _start_clock()
     detail = _label(Vector2(92, 166), Vector2(1736, 38), 22, MUTED)
     add_child(detail)
     detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -176,6 +171,25 @@ func _label(position_value: Vector2, size_value: Vector2, font_size: int, color:
     label.add_theme_color_override("font_color", color)
     return label
 
+func _start_clock() -> void:
+    _update_clock()
+    var clock_timer := Timer.new()
+    clock_timer.wait_time = 1.0
+    clock_timer.autostart = true
+    clock_timer.timeout.connect(_update_clock)
+    add_child(clock_timer)
+
+func _update_clock() -> void:
+    if not current_menu_path.is_empty() and current_menu_path != HOME_MENU_PATH:
+        return
+    var now := Time.get_time_dict_from_system()
+    var hour: int = int(now.hour)
+    var period := "AM" if hour < 12 else "PM"
+    var display_hour := hour % 12
+    if display_hour == 0:
+        display_hour = 12
+    heading.text = "%02d:%02d:%02d %s" % [display_hour, int(now.minute), int(now.second), period]
+
 func _load_registry() -> void:
     var file := FileAccess.open(REGISTRY_PATH, FileAccess.READ)
     if file == null:
@@ -200,7 +214,7 @@ func _load_home() -> void:
     if typeof(parsed) != TYPE_DICTIONARY or parsed.get("schema_version", 0) != 2:
         _show_error("Hearth menu configuration is invalid.")
         return
-    _show_menu(parsed["items"], str(parsed.get("title", "Welcome home")), "HEARTH  •  LIVING ROOM")
+    _show_menu(parsed["items"], str(parsed.get("title", "Home")), HOME_MENU_PATH)
 
 func _show_menu(next_items: Array, title: String, path: String, focus_index := 0) -> void:
     for tween in card_tweens.values():
@@ -212,8 +226,12 @@ func _show_menu(next_items: Array, title: String, path: String, focus_index := 0
     items = next_items
     buttons.clear()
     selected = 0
-    heading.text = title
-    breadcrumb.text = path
+    current_menu_title = title
+    current_menu_path = path
+    if current_menu_path == HOME_MENU_PATH:
+        _update_clock()
+    else:
+        heading.text = current_menu_title
     _set_visual_mode(path.contains("MY LIBRARY"), next_items)
     for item in items:
         if typeof(item) == TYPE_DICTIONARY:
@@ -312,16 +330,6 @@ func _add_card(item: Dictionary) -> void:
         box.add_child(mark)
         card.set_meta("art_node", mark)
         card.set_meta("mark_node", mark)
-    var name := Label.new()
-    name.text = str(item.get("label", "Item"))
-    name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    name.add_theme_font_size_override("font_size", 30)
-    name.add_theme_color_override("font_color", PAPER)
-    name.add_theme_constant_override("outline_size", 3)
-    name.add_theme_color_override("font_outline_color", Color(INK, 0.88))
-    box.add_child(name)
-    card.set_meta("name_label", name)
     if item.has("count_label"):
         var count := Label.new()
         count.text = str(item.get("count_label", ""))
@@ -420,9 +428,6 @@ func _carousel_offset(card_index: int, focus_index: int, item_count: int) -> int
     return offset
 
 func _set_card_typography(card: Button, selected_card: bool, distance: int) -> void:
-    var name_label: Label = card.get_meta("name_label", null)
-    if name_label != null:
-        name_label.add_theme_font_size_override("font_size", 28 if selected_card else 22 if distance == 1 else 17)
     var brand_label: Label = card.get_meta("brand_label") if card.has_meta("brand_label") else null
     if brand_label != null:
         brand_label.visible = selected_card
@@ -449,12 +454,12 @@ func _set_card_typography(card: Button, selected_card: bool, distance: int) -> v
         mark_node.add_theme_color_override("font_outline_color", Color(AMBER if selected_card else accent, 0.78 if selected_card else 0.42))
 
 func _set_visual_mode(in_library: bool, next_items: Array) -> void:
-    var in_streaming := breadcrumb.text.to_upper().contains("STREAMING")
+    var in_streaming := current_menu_path.to_upper().contains("STREAMING")
     var showcase_mode := in_library or in_streaming
     if in_streaming:
         background.texture = load(VIDEO_CLUB_BACKGROUND_PATH)
     elif in_library:
-        background.texture = load(ARCADE_BACKGROUND_PATH) if breadcrumb.text.ends_with("MY LIBRARY") else load(CONSOLE_GALLERY_BACKGROUND_PATH)
+        background.texture = load(ARCADE_BACKGROUND_PATH) if current_menu_path.ends_with("MY LIBRARY") else load(CONSOLE_GALLERY_BACKGROUND_PATH)
     else:
         background.texture = HOME_BACKGROUND
     veil.color = Color(INK, 0.42 if showcase_mode else 0.34)
@@ -462,10 +467,8 @@ func _set_visual_mode(in_library: bool, next_items: Array) -> void:
     collection_label.visible = showcase_mode
     selection_label.visible = showcase_mode
     if in_streaming:
-        marquee.text = "HEARTH  //  VIDEO CLUB"
         collection_label.text = "%d SERVICES READY" % next_items.size()
     elif in_library:
-        marquee.text = "HEARTH  //  ARCADE VAULT"
         var total_games := 0
         for item in next_items:
             if typeof(item) == TYPE_DICTIONARY:
@@ -475,8 +478,6 @@ func _set_visual_mode(in_library: bool, next_items: Array) -> void:
                 if typeof(item) == TYPE_DICTIONARY and str(item.get("type", "")) in ["command", "unavailable"]:
                     total_games += 1
         collection_label.text = "%d GAMES ONLINE" % total_games if total_games > 0 else "ARCADE LINK ACTIVE"
-    else:
-        marquee.text = "HEARTH  //  LIVING ROOM"
 
 func _activate(item: Dictionary, card: Button) -> void:
     last_button = card
@@ -486,13 +487,13 @@ func _activate(item: Dictionary, card: Button) -> void:
         if systems.is_empty():
             _show_error("No ROMs found. Add game files under /srv/library/games/roms, then reopen Games.")
             return
-        stack.append({"items":items,"title":heading.text,"path":breadcrumb.text,"index":selected})
-        _show_menu(systems, "My Library", breadcrumb.text + "  ›  MY LIBRARY")
+        stack.append({"items":items,"title":current_menu_title,"path":current_menu_path,"index":selected})
+        _show_menu(systems, "My Library", current_menu_path + "  ›  MY LIBRARY")
         return
     if kind == "submenu":
         var children: Array = item.get("children", [])
-        stack.append({"items":items,"title":heading.text,"path":breadcrumb.text,"index":selected})
-        _show_menu(children, str(item.get("label", "Menu")), breadcrumb.text + "  ›  " + str(item.get("label", "Menu")))
+        stack.append({"items":items,"title":current_menu_title,"path":current_menu_path,"index":selected})
+        _show_menu(children, str(item.get("label", "Menu")), current_menu_path + "  ›  " + str(item.get("label", "Menu")))
         return
     if kind == "unavailable":
         _show_error(str(item.get("error", "Install and map a compatible RetroArch core first.")))

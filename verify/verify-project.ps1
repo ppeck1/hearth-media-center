@@ -40,6 +40,7 @@ $registry = Get-Content -Raw -Path $registryPath | ConvertFrom-Json
 
 Assert-ProjectCondition ($menu.schema_version -eq 2) "menu.json schema_version must be 2."
 Assert-ProjectCondition ($menu.items -is [array]) "menu.json items must be an array."
+Assert-ProjectCondition ($menu.title -eq "Home") "menu.json must not restore the legacy greeting."
 Assert-ProjectCondition ($registry.schema_version -eq 1) "system-registry.json schema_version must be 1."
 Assert-ProjectCondition ($registry.families -is [array]) "system-registry.json families must be an array."
 Assert-ProjectCondition ($registry.systems -is [array]) "system-registry.json systems must be an array."
@@ -55,7 +56,7 @@ foreach ($artPath in $configuredArt) {
     Assert-ProjectCondition (Test-Path -LiteralPath (Join-Path $launcherRoot $relativePath) -PathType Leaf) "Missing artwork: $artPath"
 }
 
-$requiredBackground = Join-Path $launcherRoot "assets\backgrounds\arcade-living-room-v3.png"
+$requiredBackground = Join-Path $launcherRoot "assets\backgrounds\arcade-living-room-v4.png"
 Assert-ProjectCondition (Test-Path -LiteralPath $requiredBackground -PathType Leaf) "Missing optimized home background."
 
 $panelFiles = Get-ChildItem -Path (Join-Path $launcherRoot "assets\logos") -Filter "*-panel-v1.svg" -File
@@ -65,8 +66,13 @@ foreach ($panel in $panelFiles) {
 }
 
 $mainScript = Get-Content -Raw -Path (Join-Path $launcherRoot "scripts\main.gd")
-Assert-ProjectCondition ($mainScript.Contains("res://assets/backgrounds/arcade-living-room-v3.png")) "main.gd does not use the optimized home background."
+Assert-ProjectCondition ($mainScript.Contains("res://assets/backgrounds/arcade-living-room-v4.png")) "main.gd does not use the corrected home background."
 Assert-ProjectCondition ($mainScript.Contains("res://assets/backgrounds/console-gallery-v1.png")) "main.gd does not use the console gallery background."
+Assert-ProjectCondition ($mainScript.Contains("Time.get_time_dict_from_system()")) "Home heading does not use the local system clock."
+Assert-ProjectCondition (-not $mainScript.Contains("name_label")) "Carousel item-name captions should not be rendered."
+Assert-ProjectCondition (-not $mainScript.Contains("var marquee")) "Legacy yellow home metadata should not be rendered."
+Assert-ProjectCondition (-not $mainScript.Contains("var breadcrumb")) "Legacy yellow breadcrumb should not be rendered."
+Assert-ProjectCondition (-not $mainScript.Contains("Good evening")) "Legacy greeting remains in main.gd."
 
 $privacyPatterns = @(
     "C:\\Users\\",
