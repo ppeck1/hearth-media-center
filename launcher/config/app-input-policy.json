@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "description": "Policy contract for the future Fedora input bridge. It is not activated until hardware testing is complete.",
+  "adapters": {
+    "hearth": "internal",
+    "browser_streaming": "keyboard_navigation",
+    "plex": "keyboard_navigation",
+    "steam": "native",
+    "retroarch": "native",
+    "maintenance": "native"
+  },
+  "destinations": {
+    "netflix": "browser_streaming",
+    "prime": "browser_streaming",
+    "apple-tv": "browser_streaming",
+    "disney-plus": "browser_streaming",
+    "hulu": "browser_streaming",
+    "max": "browser_streaming",
+    "paramount-plus": "browser_streaming",
+    "peacock": "browser_streaming",
+    "plex": "plex",
+    "steam": "steam",
+    "retroarch-menu": "retroarch",
+    "retroarch-game": "retroarch",
+    "maintenance": "maintenance"
+  }
+}

@@ -35,8 +35,14 @@ function Get-ConfiguredArtPath {
 
 $menuPath = Join-Path $launcherRoot "config\menu.json"
 $registryPath = Join-Path $launcherRoot "config\system-registry.json"
+$inputDefaultsPath = Join-Path $launcherRoot "config\input-profiles-defaults.json"
+$inputPolicyPath = Join-Path $launcherRoot "config\app-input-policy.json"
+$inputAdaptersPath = Join-Path $launcherRoot "config\input-adapters.json"
 $menu = Get-Content -Raw -Path $menuPath | ConvertFrom-Json
 $registry = Get-Content -Raw -Path $registryPath | ConvertFrom-Json
+$inputDefaults = Get-Content -Raw -Path $inputDefaultsPath | ConvertFrom-Json
+$inputPolicy = Get-Content -Raw -Path $inputPolicyPath | ConvertFrom-Json
+$inputAdapters = Get-Content -Raw -Path $inputAdaptersPath | ConvertFrom-Json
 
 Assert-ProjectCondition ($menu.schema_version -eq 2) "menu.json schema_version must be 2."
 Assert-ProjectCondition ($menu.items -is [array]) "menu.json items must be an array."
@@ -45,6 +51,26 @@ Assert-ProjectCondition ($registry.schema_version -eq 1) "system-registry.json s
 Assert-ProjectCondition ($registry.families -is [array]) "system-registry.json families must be an array."
 Assert-ProjectCondition ($registry.systems -is [array]) "system-registry.json systems must be an array."
 Assert-ProjectCondition ($registry.systems.Count -eq 27) "Expected 27 configured systems."
+Assert-ProjectCondition ($inputDefaults.schema_version -eq 2) "input-profiles-defaults.json schema_version must be 2."
+Assert-ProjectCondition ($inputDefaults.profiles.Count -eq 2) "Expected PS5 and standard remote input profiles."
+Assert-ProjectCondition (($inputDefaults.profiles.id -contains "ps5") -and ($inputDefaults.profiles.id -contains "standard_remote")) "Required input profiles are missing."
+Assert-ProjectCondition ($inputDefaults.device_assignments -is [array]) "Input device assignments must use structured selectors."
+Assert-ProjectCondition ($inputPolicy.schema_version -eq 1) "app-input-policy.json schema_version must be 1."
+Assert-ProjectCondition ($inputPolicy.adapters.steam -eq "native") "Steam must remain native controller passthrough."
+Assert-ProjectCondition ($inputPolicy.adapters.retroarch -eq "native") "RetroArch must remain native controller passthrough."
+Assert-ProjectCondition ($inputPolicy.destinations.netflix -eq "browser_streaming") "Netflix must use the browser streaming policy."
+Assert-ProjectCondition ($inputAdapters.schema_version -eq 1) "input-adapters.json schema_version must be 1."
+Assert-ProjectCondition ($inputAdapters.adapters.keyboard_navigation.outputs.home -eq "bridge:return_to_hearth") "The bridge Home action must return safely to Hearth."
+
+$requiredActions = @("navigate_up", "navigate_down", "navigate_left", "navigate_right", "select", "back", "home", "menu", "play_pause", "page_left", "page_right")
+foreach ($profile in $inputDefaults.profiles) {
+    foreach ($action in $requiredActions) {
+        Assert-ProjectCondition ($null -ne $profile.bindings.$action) "Input profile '$($profile.id)' is missing '$action'."
+        foreach ($binding in $profile.bindings.$action) {
+            Assert-ProjectCondition ($binding.control -match "^(key|gamepad_button|gamepad_axis):") "Invalid input binding '$($binding.control)'."
+        }
+    }
+}
 
 $configuredArt = @(
     Get-ConfiguredArtPath -Value $menu
@@ -74,6 +100,29 @@ Assert-ProjectCondition (-not $mainScript.Contains("var marquee")) "Legacy yello
 Assert-ProjectCondition (-not $mainScript.Contains("var breadcrumb")) "Legacy yellow breadcrumb should not be rendered."
 Assert-ProjectCondition (-not $mainScript.Contains("Good evening")) "Legacy greeting remains in main.gd."
 
+$inputModules = @(
+    "scripts\input\input_actions.gd",
+    "scripts\input\input_event_codec.gd",
+    "scripts\input\input_profile_store.gd",
+    "scripts\input\input_manager.gd",
+    "scripts\settings\input_settings.gd",
+    "scenes\settings\input_settings.tscn",
+    "tests\input_smoke.gd"
+)
+foreach ($module in $inputModules) {
+    Assert-ProjectCondition (Test-Path -LiteralPath (Join-Path $launcherRoot $module) -PathType Leaf) "Missing input module: $module"
+}
+
+$bridgeModules = @(
+    "input_bridge\hearth_input_bridge\config.py",
+    "input_bridge\hearth_input_bridge\mapper.py",
+    "input_bridge\hearth_input_bridge\cli.py",
+    "input_bridge\tests\test_bridge.py"
+)
+foreach ($module in $bridgeModules) {
+    Assert-ProjectCondition (Test-Path -LiteralPath (Join-Path $projectRoot $module) -PathType Leaf) "Missing input bridge module: $module"
+}
+
 $privacyPatterns = @(
     "C:\\Users\\",
     "BEGIN [A-Z ]*PRIVATE KEY",
@@ -87,4 +136,4 @@ if ($LASTEXITCODE -gt 1) {
     throw "Privacy scan failed."
 }
 
-Write-Output "Static verification passed (PowerShell): $($configuredArt.Count) artwork references, 27 systems, and $($panelFiles.Count) vector service panels."
+Write-Output "Static verification passed (PowerShell): $($configuredArt.Count) artwork references, 27 systems, 2 input profiles, and $($panelFiles.Count) vector service panels."
