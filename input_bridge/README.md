@@ -1,19 +1,34 @@
-# Hearth input bridge foundation
+# Hearth Fedora input bridge
 
-This package is the non-privileged, backend-neutral core of Hearth's planned Fedora input bridge. It currently:
+This package provides Hearth's non-privileged, per-application Fedora controller bridge. It:
 
 - validates the same saved profiles used by the Godot launcher;
 - converts canonical physical events into Hearth semantic actions;
 - applies destination policy and semantic output adapters;
+- discovers and exclusively grabs joystick-capable evdev nodes for translated destinations;
+- emits allowlisted virtual-keyboard taps through `/dev/uinput`;
+- supervises Chrome or Plex and releases every input resource when the application exits;
+- treats PS / Guide or the Create + Options failsafe chord as a request to close the app and return to Hearth;
 - supports deterministic newline-delimited JSON replay for development and tests.
 
-It intentionally does **not** open `/dev/input/event*`, grab a controller, create a `uinput` device, run as root, or alter application launchers yet. Those pieces require the actual Fedora controller and remote so device capabilities, logind ACLs, disconnect recovery, and duplicate-input prevention can be verified safely.
+Steam and RetroArch remain native destinations and never open the bridge's evdev or uinput backends. The runtime never runs as root. Fedora requires `python3-evdev` plus the repository's one-time active-user uinput rule; see the root README for deployment steps.
 
 From the repository root:
 
 ```bash
 python3 -m unittest discover -s input_bridge/tests
+PYTHONPATH=input_bridge python3 -m hearth_input_bridge probe --no-uinput
 printf '%s\n' '{"control":"gamepad_button:south","pressed":true}' | \
-  python3 -m input_bridge.hearth_input_bridge replay \
+  PYTHONPATH=input_bridge python3 -m hearth_input_bridge replay \
     --config-dir launcher/config --profile ps5 --destination netflix
 ```
+
+The launch helpers call the live runtime in this form:
+
+```bash
+PYTHONPATH=/opt/hearth/input_bridge python3 -m hearth_input_bridge run \
+  --config-dir /opt/hearth/launcher/config \
+  --profile ps5 --destination netflix -- /usr/bin/google-chrome-stable ...
+```
+
+The final USB and Bluetooth DualSense paths, reconnect behavior, and streaming-site navigation must still be exercised on the target Fedora PC before calling the feature production-validated.

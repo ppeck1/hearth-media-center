@@ -59,6 +59,8 @@ Assert-ProjectCondition ($inputPolicy.schema_version -eq 1) "app-input-policy.js
 Assert-ProjectCondition ($inputPolicy.adapters.steam -eq "native") "Steam must remain native controller passthrough."
 Assert-ProjectCondition ($inputPolicy.adapters.retroarch -eq "native") "RetroArch must remain native controller passthrough."
 Assert-ProjectCondition ($inputPolicy.destinations.netflix -eq "browser_streaming") "Netflix must use the browser streaming policy."
+Assert-ProjectCondition ($inputPolicy.destinations.prime -eq "browser_streaming") "Prime Video must use its menu destination id without changing its Chrome profile path."
+Assert-ProjectCondition ($inputPolicy.destinations.plex -eq "plex") "Plex must use the translated Plex policy."
 Assert-ProjectCondition ($inputAdapters.schema_version -eq 1) "input-adapters.json schema_version must be 1."
 Assert-ProjectCondition ($inputAdapters.adapters.keyboard_navigation.outputs.home -eq "bridge:return_to_hearth") "The bridge Home action must return safely to Hearth."
 
@@ -117,11 +119,29 @@ $bridgeModules = @(
     "input_bridge\hearth_input_bridge\config.py",
     "input_bridge\hearth_input_bridge\mapper.py",
     "input_bridge\hearth_input_bridge\cli.py",
-    "input_bridge\tests\test_bridge.py"
+    "input_bridge\hearth_input_bridge\evdev_source.py",
+    "input_bridge\hearth_input_bridge\uinput_sink.py",
+    "input_bridge\hearth_input_bridge\process_runner.py",
+    "input_bridge\tests\test_bridge.py",
+    "input_bridge\tests\test_linux_runtime.py",
+    "launchers\run-with-input-bridge.sh"
 )
 foreach ($module in $bridgeModules) {
     Assert-ProjectCondition (Test-Path -LiteralPath (Join-Path $projectRoot $module) -PathType Leaf) "Missing input bridge module: $module"
 }
+
+$browserLauncher = Get-Content -Raw -Path (Join-Path $projectRoot "launchers\browser-service.sh")
+$primeLauncher = Get-Content -Raw -Path (Join-Path $projectRoot "launchers\prime-video.sh")
+$plexLauncher = Get-Content -Raw -Path (Join-Path $projectRoot "launchers\plex-htpc.sh")
+Assert-ProjectCondition ($browserLauncher.Contains("run-with-input-bridge.sh")) "Browser services do not start the input bridge."
+Assert-ProjectCondition ($primeLauncher.Contains("prime-video https://www.amazon.com/gp/video/storefront prime")) "Prime Video policy id must not replace its existing browser profile path."
+Assert-ProjectCondition ($plexLauncher.Contains("run-with-input-bridge.sh plex")) "Plex does not start the input bridge."
+Assert-ProjectCondition (Test-Path -LiteralPath (Join-Path $projectRoot "deploy\fedora\69-hearth-uinput.rules") -PathType Leaf) "Missing Fedora uinput rule."
+Assert-ProjectCondition (Test-Path -LiteralPath (Join-Path $projectRoot "deploy\fedora\install-input-access.sh") -PathType Leaf) "Missing Fedora input setup script."
+$uinputRule = Get-Content -Raw -Path (Join-Path $projectRoot "deploy\fedora\69-hearth-uinput.rules")
+Assert-ProjectCondition ($uinputRule.Contains('TAG+="uaccess"')) "Fedora uinput rule must use active-user access."
+Assert-ProjectCondition (-not ($uinputRule -match 'MODE="?0?666|GROUP="input"')) "Fedora uinput rule grants unsafe broad access."
+Assert-ProjectCondition (Test-Path -LiteralPath (Join-Path $projectRoot "deploy\fedora\hearth-uinput.conf") -PathType Leaf) "Missing persistent uinput module configuration."
 
 $privacyPatterns = @(
     "C:\\Users\\",

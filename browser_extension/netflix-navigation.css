@@ -1,0 +1,18 @@
+[data-hearth-tile-mode="true"] a[data-uia="standard-card"],
+[data-hearth-tile-mode="true"] a[data-uia="progress-card"],
+[data-hearth-tile-mode="true"] a[data-uia="ranked-card"],
+[data-hearth-tile-mode="true"] a[data-uia="cloud-game-card"] {
+  pointer-events: none !important;
+}
+
+[data-hearth-tile-focus="true"] {
+  outline: 5px solid #ffffff !important;
+  outline-offset: 4px !important;
+  border-radius: 6px !important;
+}
+
+[data-hearth-action-focus="true"] {
+  outline: 4px solid #e50914 !important;
+  outline-offset: 3px !important;
+  border-radius: 999px !important;
+}

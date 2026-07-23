@@ -10,7 +10,8 @@
       "id": "ps5",
       "label": "PS5 DualSense",
       "match": {
-        "name_contains": ["dualsense", "dualsense wireless controller"]
+        "name_contains": ["dualsense", "dualsense wireless controller"],
+        "evdev": {"vendor_id":1356, "product_ids":[3302]}
       },
       "bindings": {
         "navigate_up": [{"control":"gamepad_button:dpad_up"}, {"control":"gamepad_axis:left_y", "direction":-1, "threshold":0.72}],
@@ -21,9 +22,9 @@
         "back": [{"control":"gamepad_button:east"}],
         "home": [{"control":"gamepad_button:guide"}],
         "menu": [{"control":"gamepad_button:start"}],
-        "play_pause": [{"control":"gamepad_button:touchpad"}],
-        "page_left": [{"control":"gamepad_button:left_shoulder"}],
-        "page_right": [{"control":"gamepad_button:right_shoulder"}]
+        "play_pause": [{"control":"gamepad_button:touchpad"}, {"control":"gamepad_button:north"}],
+        "page_left": [{"control":"gamepad_button:left_shoulder"},{"control":"gamepad_button:left_stick"}],
+        "page_right": [{"control":"gamepad_button:right_shoulder"},{"control":"gamepad_button:right_stick"}]
       }
     },
     {

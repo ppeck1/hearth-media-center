@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "description": "Semantic output definitions for the future Fedora input bridge. No executable paths are permitted here.",
+  "description": "Allowlisted semantic outputs for the Fedora input bridge. No executable paths are permitted here.",
   "adapters": {
     "keyboard_navigation": {
       "outputs": {

@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Hearth Netflix Tile Navigation",
+  "version": "1.0.3",
+  "description": "Keeps controller navigation on Netflix title tiles until the selected tile enters action mode.",
+  "content_scripts": [
+    {
+      "matches": ["https://www.netflix.com/*"],
+      "js": ["netflix-navigation.js"],
+      "css": ["netflix-navigation.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

@@ -22,6 +22,9 @@ The Home screen combines a live local clock with a clean, artwork-led carousel.
 - Discovers a personal ROM library and organizes known folder aliases into console families.
 - Launches RetroArch games only through configured Libretro cores and validated library paths.
 - Opens Steam Big Picture, Plex HTPC, and isolated Chrome app profiles for streaming services.
+- Enables Chromium spatial navigation in streaming windows so translated D-pad arrows can move page focus.
+- Keeps Netflix catalogue navigation tile-first; Select enters a tile's actions and Back returns to tile browsing.
+- Keeps controller navigation active while Chrome streaming services or Plex are running.
 - Returns focus to Hearth after a launched application exits.
 - Provides editable PS5 DualSense and standard-remote input profiles.
 - Keeps Arrow keys, Enter, and Escape available as recovery controls.
@@ -50,7 +53,7 @@ The screenshots are captured directly from the Godot project at 1920x1080 using 
 | ROM discovery and RetroArch launch validation | Implemented |
 | PS5 / standard remote mapping UI | Implemented and smoke-tested |
 | Backend-neutral translation core | Implemented with deterministic replay tests |
-| Cross-application `evdev` / `uinput` service | Not activated; requires target Fedora hardware QA |
+| Per-app `evdev` / `uinput` controller bridge | Implemented; requires target Fedora hardware QA |
 | Turnkey Fedora installer | Not included; deployment contract is documented below |
 
 Hearth is designed for the Fedora appliance described here, but the new controller profiles and cross-application bridge have not yet been validated with the final USB/Bluetooth hardware on that PC.
@@ -62,9 +65,10 @@ Hearth is designed for the Fedora appliance described here, but the new controll
 | Browse | D-pad or left stick | Arrow keys |
 | Select | Cross / south face button | Enter |
 | Back | Circle / east face button | Escape |
-| Previous / next page | L1 / R1 | Page Up / Page Down |
+| Previous / next page | L1 / R1, or L3 / R3 for fast tile paging | Page Up / Page Down |
 | Menu | Options | Menu |
-| Hearth home | PS / Guide | Home |
+| Play / pause | Triangle while streaming; Touchpad inside Hearth | Media Play/Pause |
+| Hearth home | PS / Guide, or Create + Options failsafe chord | Home |
 
 Open **Settings**, choose an input source and profile, then select **Remap** beside an action. Profiles can be tested, reset, and saved without editing project files. Runtime settings are written to:
 
@@ -72,7 +76,9 @@ Open **Settings**, choose an input source and profile, then select **Remap** bes
 ${XDG_CONFIG_HOME:-$HOME/.config}/hearth/input-profiles.json
 ```
 
-Controllers of the same SDL type currently share their Godot-side profile. Stable per-device Linux identities will be added with the Fedora input service.
+Controllers of the same SDL type currently share their Godot-side profile. The Fedora bridge accepts joystick-capable event nodes and rejects keyboard-shaped and Hearth virtual devices; USB and Bluetooth identity pinning remains a target-hardware follow-up.
+
+The live bridge is intentionally scoped to one DualSense-class controller for the first Fedora deployment. It matches the standard DualSense evdev vendor/product identity with SDL-name fallback, uses the saved PS5 profile, and leaves keyboard-style remotes directly connected to Chrome or Plex.
 
 ## Architecture
 
@@ -82,9 +88,10 @@ flowchart LR
     Library["Personal ROM library"] --> Launcher
     Profiles["Input profiles"] --> Launcher
     Launcher --> Scripts["Validated launch scripts"]
-    Scripts --> Apps["RetroArch / Steam / Plex / Chrome"]
-    Profiles -. "dry-run today" .-> Bridge["Input bridge core"]
-    Bridge -. "future evdev + uinput" .-> Apps
+    Scripts --> Native["RetroArch / Steam"]
+    Scripts --> Bridge["Per-app input bridge"]
+    Profiles --> Bridge
+    Bridge --> Stream["Plex / Chrome"]
 ```
 
 The input implementation is intentionally split into small responsibilities:
@@ -94,7 +101,9 @@ The input implementation is intentionally split into small responsibilities:
 - [`input_profile_store.gd`](launcher/scripts/input/input_profile_store.gd) validates and persists profiles safely.
 - [`input_manager.gd`](launcher/scripts/input/input_manager.gd) matches devices and routes actions.
 - [`input_settings.gd`](launcher/scripts/settings/input_settings.gd) owns the settings and capture workflow.
-- [`input_bridge/`](input_bridge/) contains the non-privileged Python translation core and replay tests.
+- [`evdev_source.py`](input_bridge/hearth_input_bridge/evdev_source.py) discovers, filters, grabs, and decodes Linux controllers.
+- [`uinput_sink.py`](input_bridge/hearth_input_bridge/uinput_sink.py) owns the allowlisted virtual keyboard.
+- [`process_runner.py`](input_bridge/hearth_input_bridge/process_runner.py) supervises one Chrome or Plex session and guarantees cleanup.
 
 ## Quick start for development
 
@@ -102,6 +111,7 @@ Prerequisites:
 
 - Godot 4
 - Python 3.11 or newer
+- `python3-evdev` for live Fedora controller translation
 - Bash, `jq`, and `rg` for the complete Linux verification script
 
 Clone the repository and start the launcher:
@@ -130,10 +140,18 @@ A minimal manual deployment looks like:
 
 ```bash
 sudo install -d /opt/hearth/runtime
-sudo cp -a launcher launchers /opt/hearth/
+sudo cp -a launcher launchers input_bridge browser_extension deploy /opt/hearth/
 sudo install -m 0755 /path/to/godot /opt/hearth/runtime/godot
 sudo chmod +x /opt/hearth/launchers/*.sh
+sudo dnf install python3-evdev
+sudo /opt/hearth/deploy/fedora/install-input-access.sh
 /opt/hearth/launchers/hearth.sh
+```
+
+After logging out and back in, verify controller discovery and the active-user `/dev/uinput` permission without launching a streaming app:
+
+```bash
+PYTHONPATH=/opt/hearth/input_bridge python3 -m hearth_input_bridge probe
 ```
 
 `hearth.sh` starts Godot with the Wayland display driver at 1920x1080. Optional destinations require their corresponding software:
@@ -156,7 +174,7 @@ Streaming accounts, browser profiles, ROMs, BIOS files, cores, and application c
 | [`menu.json`](launcher/config/menu.json) | Home destinations and application commands |
 | [`system-registry.json`](launcher/config/system-registry.json) | Console families, folder aliases, artwork, extensions, and Libretro cores |
 | [`input-profiles-defaults.json`](launcher/config/input-profiles-defaults.json) | Built-in PS5 and remote mappings |
-| [`app-input-policy.json`](launcher/config/app-input-policy.json) | Destination-to-adapter policy for the future Fedora bridge |
+| [`app-input-policy.json`](launcher/config/app-input-policy.json) | Destination-to-adapter policy for the Fedora bridge |
 | [`input-adapters.json`](launcher/config/input-adapters.json) | Semantic output definitions; contains no executable paths |
 | [`personal-rom-library.md`](docs/personal-rom-library.md) | Library layout and launch-safety details |
 
@@ -186,21 +204,23 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\verify\verify-project.
 
 ## Input bridge boundary
 
-The Python bridge package currently validates the shared configuration, translates canonical replay events into semantic Hearth actions, and applies destination adapters. It does **not** yet:
+Chrome streaming and Plex are launched through a short-lived, unprivileged Python supervisor. During that application session it:
 
-- open `/dev/input/event*`;
-- exclusively grab a controller or remote;
-- create a virtual device through `uinput`;
-- run as root or change device permissions;
-- modify the Chrome, Plex, Steam, or RetroArch launchers.
+- discovers joystick-capable `/dev/input/event*` nodes and rejects keyboard-shaped devices;
+- exclusively grabs the controller to prevent duplicate browser Gamepad input;
+- emits only configured, allowlisted keys through a temporary `uinput` keyboard;
+- treats PS / Guide as a safe request to close the application and return to Hearth;
+- releases the grab and virtual device on application exit, signal, disconnect, or bridge failure.
 
-Those operations will be implemented only after the actual Fedora machine can verify device capabilities, logind ACLs, disconnect recovery, and duplicate-input prevention. Steam and RetroArch will remain native-controller destinations; translation is intended primarily for browser streaming and Plex navigation. See the [bridge notes and replay example](input_bridge/README.md).
+Steam and RetroArch bypass the bridge and keep native controller input. If `python3-evdev` or the `/dev/uinput` ACL is unavailable, the selected application still opens, but controller translation is disabled and a diagnostic is written to stderr. The bridge never runs as root; root is used only for the one-time, narrowly scoped udev rule. See the [bridge runtime notes](input_bridge/README.md).
 
 ## Known limitations
 
 - Deployment is manual and assumes the fixed `/opt/hearth` and `/srv/library` paths.
 - USB and Bluetooth identities for the final controller and remote still need target-hardware validation.
 - Browser and Plex behavior depends on external applications and account setup.
+- The controller bridge works without a visual HUD. GNOME Wayland cannot guarantee that a normal overlay window stays above a fullscreen application, so a visible cross-app HUD is not included in this phase.
+- The active desktop user receives `/dev/uinput` access on this single-purpose appliance. That permission can create virtual input devices, so the media account should not run untrusted software.
 - The maintenance destination is currently a supervised test dialog, not a full maintenance desktop.
 - No software license file is currently included.
 
