@@ -90,6 +90,16 @@ class MapperTests(unittest.TestCase):
         self.assertEqual(semantic.feed({"control": "gamepad_axis:left_x", "value": 0.0}), [])
         self.assertEqual(semantic.feed(right), ["navigate_right"])
 
+    def test_stick_clicks_map_to_fast_page_outputs(self) -> None:
+        semantic = SemanticMapper(self.config.profile("ps5"))
+        adapter = AdapterMapper(self.config.adapters, "keyboard_navigation", "netflix")
+        page_up = semantic.feed({"control": "gamepad_button:left_stick", "pressed": True})
+        page_down = semantic.feed({"control": "gamepad_button:right_stick", "pressed": True})
+        self.assertEqual(page_up, ["page_left"])
+        self.assertEqual(page_down, ["page_right"])
+        self.assertEqual(adapter.output_for(page_up[0]), "key:page_up")
+        self.assertEqual(adapter.output_for(page_down[0]), "key:page_down")
+
     def test_native_adapter_emits_nothing(self) -> None:
         adapter = AdapterMapper(self.config.adapters, "native", "steam")
         self.assertIsNone(adapter.output_for("select"))

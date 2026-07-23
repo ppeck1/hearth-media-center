@@ -22,6 +22,8 @@ The Home screen combines a live local clock with a clean, artwork-led carousel.
 - Discovers a personal ROM library and organizes known folder aliases into console families.
 - Launches RetroArch games only through configured Libretro cores and validated library paths.
 - Opens Steam Big Picture, Plex HTPC, and isolated Chrome app profiles for streaming services.
+- Enables Chromium spatial navigation in streaming windows so translated D-pad arrows can move page focus.
+- Keeps Netflix catalogue navigation tile-first; Select enters a tile's actions and Back returns to tile browsing.
 - Keeps controller navigation active while Chrome streaming services or Plex are running.
 - Returns focus to Hearth after a launched application exits.
 - Provides editable PS5 DualSense and standard-remote input profiles.
@@ -63,10 +65,10 @@ Hearth is designed for the Fedora appliance described here, but the new controll
 | Browse | D-pad or left stick | Arrow keys |
 | Select | Cross / south face button | Enter |
 | Back | Circle / east face button | Escape |
-| Previous / next page | L1 / R1 | Page Up / Page Down |
+| Previous / next page | L1 / R1, or L3 / R3 for fast tile paging | Page Up / Page Down |
 | Menu | Options | Menu |
 | Play / pause | Triangle while streaming; Touchpad inside Hearth | Media Play/Pause |
-| Hearth home | PS / Guide | Home |
+| Hearth home | PS / Guide, or Create + Options failsafe chord | Home |
 
 Open **Settings**, choose an input source and profile, then select **Remap** beside an action. Profiles can be tested, reset, and saved without editing project files. Runtime settings are written to:
 
@@ -138,7 +140,7 @@ A minimal manual deployment looks like:
 
 ```bash
 sudo install -d /opt/hearth/runtime
-sudo cp -a launcher launchers input_bridge deploy /opt/hearth/
+sudo cp -a launcher launchers input_bridge browser_extension deploy /opt/hearth/
 sudo install -m 0755 /path/to/godot /opt/hearth/runtime/godot
 sudo chmod +x /opt/hearth/launchers/*.sh
 sudo dnf install python3-evdev

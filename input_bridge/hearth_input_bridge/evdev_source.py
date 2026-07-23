@@ -32,9 +32,20 @@ def _codes(ecodes: Any, names: Iterable[str]) -> set[int]:
     return {value for name in names if (value := _code(ecodes, name)) is not None}
 
 
+def _capability_codes(entries: Iterable[Any]) -> set[int]:
+    """Return event codes from both plain and ``(code, info)`` evdev shapes."""
+    codes: set[int] = set()
+    for entry in entries:
+        if isinstance(entry, int):
+            codes.add(entry)
+        elif isinstance(entry, tuple) and entry and isinstance(entry[0], int):
+            codes.add(entry[0])
+    return codes
+
+
 def is_controller_capabilities(capabilities: dict[int, Any], ecodes: Any) -> bool:
-    key_codes = set(capabilities.get(ecodes.EV_KEY, []))
-    abs_codes = set(capabilities.get(ecodes.EV_ABS, []))
+    key_codes = _capability_codes(capabilities.get(ecodes.EV_KEY, []))
+    abs_codes = _capability_codes(capabilities.get(ecodes.EV_ABS, []))
     gamepad_buttons = _codes(
         ecodes,
         (

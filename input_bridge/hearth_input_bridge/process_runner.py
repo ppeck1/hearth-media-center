@@ -14,6 +14,7 @@ from .mapper import AdapterMapper, SemanticMapper
 from .uinput_sink import UInputSink, UInputUnavailable
 
 FORCE_KILL_SIGNAL = getattr(signal, "SIGKILL", 9)
+RETURN_CHORD_CONTROLS = frozenset({"gamepad_button:back", "gamepad_button:start"})
 
 
 def _signal_process(child: Any, signum: int) -> None:
@@ -21,6 +22,23 @@ def _signal_process(child: Any, signum: int) -> None:
         os.killpg(child.pid, signum)
     else:
         child.send_signal(signum)
+
+
+class ReturnToHearthChord:
+    """Recognizes the DualSense Create + Options failsafe chord."""
+
+    def __init__(self) -> None:
+        self._pressed: set[str] = set()
+
+    def feed(self, event: dict[str, Any]) -> bool:
+        control = event.get("control")
+        if control not in RETURN_CHORD_CONTROLS:
+            return False
+        if event.get("pressed", True) is True:
+            self._pressed.add(control)
+        else:
+            self._pressed.discard(control)
+        return RETURN_CHORD_CONTROLS <= self._pressed
 
 
 class SessionRunner:
@@ -65,6 +83,7 @@ class SessionRunner:
         profile = self._config.profile(self._profile_id)
         mapper = SemanticMapper(profile)
         adapter = AdapterMapper(self._config.adapters, adapter_id, self._destination_id)
+        return_chord = ReturnToHearthChord()
         source: Any | None = None
         sink: Any | None = None
         reported_source_error = ""
@@ -100,6 +119,10 @@ class SessionRunner:
                             reported_source_error = source_error
                         return_requested = False
                         for event in events:
+                            if return_chord.feed(event):
+                                self._terminate_child()
+                                return_requested = True
+                                break
                             for action in mapper.feed(event):
                                 output = adapter.output_for(action)
                                 if output == "bridge:return_to_hearth":

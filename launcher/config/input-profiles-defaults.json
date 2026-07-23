@@ -23,8 +23,8 @@
         "home": [{"control":"gamepad_button:guide"}],
         "menu": [{"control":"gamepad_button:start"}],
         "play_pause": [{"control":"gamepad_button:touchpad"}, {"control":"gamepad_button:north"}],
-        "page_left": [{"control":"gamepad_button:left_shoulder"}],
-        "page_right": [{"control":"gamepad_button:right_shoulder"}]
+        "page_left": [{"control":"gamepad_button:left_shoulder"},{"control":"gamepad_button:left_stick"}],
+        "page_right": [{"control":"gamepad_button:right_shoulder"},{"control":"gamepad_button:right_stick"}]
       }
     },
     {

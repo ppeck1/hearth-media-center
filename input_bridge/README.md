@@ -8,6 +8,7 @@ This package provides Hearth's non-privileged, per-application Fedora controller
 - discovers and exclusively grabs joystick-capable evdev nodes for translated destinations;
 - emits allowlisted virtual-keyboard taps through `/dev/uinput`;
 - supervises Chrome or Plex and releases every input resource when the application exits;
+- treats PS / Guide or the Create + Options failsafe chord as a request to close the app and return to Hearth;
 - supports deterministic newline-delimited JSON replay for development and tests.
 
 Steam and RetroArch remain native destinations and never open the bridge's evdev or uinput backends. The runtime never runs as root. Fedora requires `python3-evdev` plus the repository's one-time active-user uinput rule; see the root README for deployment steps.

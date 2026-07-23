@@ -6,6 +6,7 @@ jq -e '.title == "Home"' "${root}/launcher/config/menu.json" >/dev/null
 jq -e '.schema_version == 1 and (.families | type == "array") and (.systems | type == "array")' "${root}/launcher/config/system-registry.json" >/dev/null
 jq -e '.families | all(has("art") and (.art | type == "string" and length > 0))' "${root}/launcher/config/system-registry.json" >/dev/null
 jq -e '.schema_version == 2 and (.profiles | length == 2) and (.device_assignments | type == "array") and ([.profiles[].id] | contains(["ps5", "standard_remote"]))' "${root}/launcher/config/input-profiles-defaults.json" >/dev/null
+jq -e '.profiles[] | select(.id == "ps5") | (.bindings.page_left | any(.control == "gamepad_button:left_stick")) and (.bindings.page_right | any(.control == "gamepad_button:right_stick"))' "${root}/launcher/config/input-profiles-defaults.json" >/dev/null
 jq -e '.schema_version == 1 and .adapters.steam == "native" and .adapters.retroarch == "native"' "${root}/launcher/config/app-input-policy.json" >/dev/null
 jq -e '.schema_version == 1 and .adapters.keyboard_navigation.outputs.home == "bridge:return_to_hearth"' "${root}/launcher/config/input-adapters.json" >/dev/null
 jq -e --slurpfile menu "${root}/launcher/config/menu.json" '
@@ -28,6 +29,12 @@ if rg -q -e 'MODE="?0?666' -e 'GROUP="input"' "${root}/deploy/fedora/69-hearth-u
 fi
 test -x "${root}/launchers/run-with-input-bridge.sh"
 rg -q 'run-with-input-bridge.sh.*destination_id' "${root}/launchers/browser-service.sh"
+rg -q -- '--enable-spatial-navigation' "${root}/launchers/browser-service.sh"
+rg -q -- '--load-extension=' "${root}/launchers/browser-service.sh"
+jq -e '.manifest_version == 3 and (.content_scripts[0].matches == ["https://www.netflix.com/*"])' "${root}/browser_extension/manifest.json" >/dev/null
+if command -v node >/dev/null 2>&1; then
+  node --check "${root}/browser_extension/netflix-navigation.js"
+fi
 rg -q 'browser-service.sh prime-video .* prime$' "${root}/launchers/prime-video.sh"
 rg -q 'run-with-input-bridge.sh plex' "${root}/launchers/plex-htpc.sh"
 for module in \

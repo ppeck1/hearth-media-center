@@ -97,6 +97,23 @@ class EvdevDecoderTests(unittest.TestCase):
         self.assertTrue(is_controller_capabilities(controller, FakeEcodes))
         self.assertFalse(is_controller_capabilities(keyboard, FakeEcodes))
 
+    def test_controller_capability_filter_accepts_evdev_absinfo_shape(self) -> None:
+        axis_info = SimpleNamespace(value=0, min=-32768, max=32767)
+        controller = {
+            FakeEcodes.EV_KEY: [
+                FakeEcodes.BTN_SOUTH,
+                FakeEcodes.BTN_EAST,
+                FakeEcodes.BTN_NORTH,
+                FakeEcodes.BTN_WEST,
+            ],
+            FakeEcodes.EV_ABS: [
+                (FakeEcodes.ABS_X, axis_info),
+                (FakeEcodes.ABS_Y, axis_info),
+            ],
+        }
+
+        self.assertTrue(is_controller_capabilities(controller, FakeEcodes))
+
     def test_decodes_dualsense_buttons_and_release(self) -> None:
         pressed = self.decoder.feed(SimpleNamespace(type=FakeEcodes.EV_KEY, code=FakeEcodes.BTN_SOUTH, value=1))
         released = self.decoder.feed(SimpleNamespace(type=FakeEcodes.EV_KEY, code=FakeEcodes.BTN_SOUTH, value=0))
@@ -273,6 +290,32 @@ class SessionRunnerTests(unittest.TestCase):
         source = FakeSource(
             [
                 {"control": "gamepad_button:guide", "pressed": True},
+                {"control": "gamepad_button:south", "pressed": True},
+            ],
+            grab=True,
+        )
+        sink = FakeSink()
+        process = FakeProcess(finish_after_polls=100)
+        runner = SessionRunner(
+            self.config,
+            "ps5",
+            "netflix",
+            ["fake-browser"],
+            source_factory=lambda **_kwargs: source,
+            sink_factory=lambda: sink,
+            popen=lambda *_args, **_kwargs: process,
+            signal_process=lambda child, _signum: child.terminate(),
+            poll_interval=0,
+        )
+        self.assertEqual(runner.run(), 0)
+        self.assertTrue(process.terminated)
+        self.assertEqual(sink.outputs, [])
+
+    def test_create_and_options_chord_is_a_failsafe_return_to_hearth(self) -> None:
+        source = FakeSource(
+            [
+                {"control": "gamepad_button:back", "pressed": True},
+                {"control": "gamepad_button:start", "pressed": True},
                 {"control": "gamepad_button:south", "pressed": True},
             ],
             grab=True,
