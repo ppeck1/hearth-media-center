@@ -15,8 +15,10 @@
       {"id":"paramount-plus","label":"Paramount+","subtitle":"Sign-in required","mark":"P+","color":"37609c","art":"res://assets/logos/paramountplus-panel-v1.svg","type":"command","executable":"/opt/hearth/launchers/paramount-plus.sh","args":[],"enabled":true},
       {"id":"peacock","label":"Peacock","subtitle":"Sign-in required","mark":"P","color":"8e5576","art":"res://assets/logos/peacock-panel-v1.svg","type":"command","executable":"/opt/hearth/launchers/peacock.sh","args":[],"enabled":true}
     ]},
-    {"id":"maintenance","label":"Maintenance","subtitle":"Desktop tools","hint":"For supervised maintenance only","mark":"TOOLS","color":"5e6470","art":"res://assets/nav/maintenance-panel-v1.svg","type":"command","executable":"/opt/hearth/launchers/maintenance-mode.sh","args":[],"enabled":true},
-    {"id":"settings","label":"Settings","subtitle":"Controllers and remotes","hint":"Configure input profiles","mark":"⚙","color":"62758f","type":"panel","panel_id":"input_settings","enabled":true},
+    {"id":"settings","label":"Settings","caption":"Settings","subtitle":"Controllers, remotes, and desktop","hint":"Open settings","mark":"⚙","color":"62758f","type":"submenu","enabled":true,"children":[
+      {"id":"controllers-remotes","label":"Controllers and Remotes","caption":"Controllers and Remotes","subtitle":"Input profiles","hint":"Configure controllers and remotes","mark":"PAD","color":"62758f","type":"panel","panel_id":"input_settings","enabled":true},
+      {"id":"desktop-settings","label":"Desktop Settings","caption":"Desktop Settings","subtitle":"Wi-Fi, Bluetooth, displays, sound, and power","hint":"Open desktop settings","mark":"⚙","color":"5e6470","type":"command","executable":"/opt/hearth/launchers/desktop-settings.sh","args":[],"detached":true,"enabled":true}
+    ]},
     {"id":"system","label":"System","subtitle":"Power controls","hint":"Restart or shut down safely","mark":"I/O","color":"6d4c4c","art":"res://assets/nav/system-panel-v1.svg","type":"submenu","enabled":true,"children":[
       {"id":"restart","label":"Restart","subtitle":"Restart this PC","mark":"RE","color":"6d4c4c","type":"command","executable":"/opt/hearth/launchers/restart.sh","args":[],"enabled":true},
       {"id":"shutdown","label":"Shut Down","subtitle":"Power off this PC","mark":"OFF","color":"6d4c4c","type":"command","executable":"/opt/hearth/launchers/shutdown.sh","args":[],"enabled":true}

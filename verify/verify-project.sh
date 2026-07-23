@@ -3,6 +3,13 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 jq -e '.schema_version == 2 and (.items | type == "array")' "${root}/launcher/config/menu.json" >/dev/null
 jq -e '.title == "Home"' "${root}/launcher/config/menu.json" >/dev/null
+jq -e '
+  ([.items[].id] | index("maintenance") | not) and
+  (.items[] | select(.id == "settings") |
+    .type == "submenu" and
+    ([.children[].id] | contains(["controllers-remotes", "desktop-settings"]))
+  )
+' "${root}/launcher/config/menu.json" >/dev/null
 jq -e '.schema_version == 1 and (.families | type == "array") and (.systems | type == "array")' "${root}/launcher/config/system-registry.json" >/dev/null
 jq -e '.families | all(has("art") and (.art | type == "string" and length > 0))' "${root}/launcher/config/system-registry.json" >/dev/null
 jq -e '.schema_version == 2 and (.profiles | length == 2) and (.device_assignments | type == "array") and ([.profiles[].id] | contains(["ps5", "standard_remote"]))' "${root}/launcher/config/input-profiles-defaults.json" >/dev/null
@@ -28,6 +35,22 @@ if rg -q -e 'MODE="?0?666' -e 'GROUP="input"' "${root}/deploy/fedora/69-hearth-u
   exit 1
 fi
 test -x "${root}/launchers/run-with-input-bridge.sh"
+test -x "${root}/launchers/desktop-settings.sh"
+for tool in \
+  sync-game-artwork.sh \
+  install-retroarch-cores.sh \
+  install-retroarch-system-assets.sh; do
+  test -x "${root}/tools/${tool}"
+  bash -n "${root}/tools/${tool}"
+done
+if rg -q -e '/srv/library' -e 'HEARTH_ROM_ROOT' -e 'thumbnails\.libretro\.com' "${root}/tools/sync-game-artwork.sh"; then
+  printf '%s\n' 'Artwork sync must not inspect the ROM library or make per-title thumbnail requests.' >&2
+  exit 1
+fi
+rg -q 'DisplayServer.window_is_focused' "${root}/launcher/scripts/main.gd"
+rg -q 'NOTIFICATION_APPLICATION_FOCUS_IN' "${root}/launcher/scripts/main.gd"
+rg -q 'caption.*game_title' "${root}/launcher/scripts/main.gd"
+rg -q 'retroarch.*thumbnails' "${root}/launcher/scripts/main.gd"
 rg -q 'run-with-input-bridge.sh.*destination_id' "${root}/launchers/browser-service.sh"
 rg -q -- '--enable-spatial-navigation' "${root}/launchers/browser-service.sh"
 rg -q -- '--load-extension=' "${root}/launchers/browser-service.sh"
@@ -44,6 +67,7 @@ for module in \
   scripts/input/input_manager.gd \
   scripts/settings/input_settings.gd \
   scenes/settings/input_settings.tscn \
+  tests/library_smoke.gd \
   tests/input_smoke.gd; do
   test -f "${root}/launcher/${module}"
 done
@@ -56,6 +80,7 @@ PYTHONPATH="${root}" python3 -m unittest discover -s "${root}/input_bridge/tests
 if command -v godot >/dev/null 2>&1; then
   godot --headless --path "${root}/launcher" --import
   godot --headless --path "${root}/launcher" --script res://tests/input_smoke.gd
+  godot --headless --path "${root}/launcher" --script res://tests/library_smoke.gd
 fi
 test -f "${root}/launcher/assets/backgrounds/arcade-living-room-v4.png"
 rg -q 'res://assets/backgrounds/arcade-living-room-v4.png' "${root}/launcher/scripts/main.gd"

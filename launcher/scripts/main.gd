@@ -8,6 +8,7 @@ const MUTED := Color("aeb9c8")
 const MENU_PATH := "res://config/menu.json"
 const REGISTRY_PATH := "res://config/system-registry.json"
 const LIBRARY_ROOT := "/srv/library/games/roms"
+const SYSTEM_CORE_ROOT := "/usr/lib64/libretro"
 const HOME_MENU_PATH := "HEARTH  •  LIVING ROOM"
 const HOME_BACKGROUND := preload("res://assets/backgrounds/arcade-living-room-v4.png")
 const ARCADE_BACKGROUND_PATH := "res://assets/backgrounds/arcade-attract-v1.png"
@@ -98,10 +99,12 @@ var card_tweens: Dictionary = {}
 var art_shader: Shader
 var current_menu_title := ""
 var current_menu_path := ""
+var input_rearm_at_msec := 0
 @onready var input_manager = $InputManager
 @onready var input_settings = $InputSettings
 
 func _ready() -> void:
+    input_rearm_at_msec = Time.get_ticks_msec() + 450
     input_settings.closed.connect(_on_input_settings_closed)
     _build_ui()
     _load_registry()
@@ -290,8 +293,9 @@ func _add_card(item: Dictionary) -> void:
         box.add_child(brand_label)
         card.set_meta("brand_label", brand_label)
     var art_path := str(item.get("art", ""))
-    var art_texture: Texture2D = load(art_path) if not art_path.is_empty() else null
-    if art_texture != null:
+    var external_art := not art_path.is_empty() and not art_path.begins_with("res://") and FileAccess.file_exists(art_path)
+    var art_texture := _load_art_texture(art_path) if not external_art else null
+    if art_texture != null or external_art:
         var art_region: Array = item.get("art_region", [])
         if art_region.size() == 4:
             var atlas_texture := AtlasTexture.new()
@@ -318,6 +322,8 @@ func _add_card(item: Dictionary) -> void:
         card.set_meta("art_node", art)
         card.set_meta("art_material", art_material)
         card.set_meta("is_cutout", art_path.contains("cutout"))
+        if external_art:
+            card.set_meta("external_art_path", art_path)
     else:
         var mark := Label.new()
         mark.text = str(item.get("mark", "•"))
@@ -339,9 +345,34 @@ func _add_card(item: Dictionary) -> void:
         count.add_theme_color_override("font_color", AMBER)
         box.add_child(count)
         card.set_meta("count_label_node", count)
+    if item.has("caption"):
+        var caption := Label.new()
+        caption.text = str(item.get("caption", ""))
+        caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        caption.max_lines_visible = 2
+        caption.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+        caption.add_theme_font_size_override("font_size", 20)
+        caption.add_theme_color_override("font_color", PAPER)
+        caption.add_theme_constant_override("outline_size", 4)
+        caption.add_theme_color_override("font_outline_color", Color(INK, 0.92))
+        box.add_child(caption)
+        card.set_meta("caption_node", caption)
 
     card.set_meta("accent", accent)
     buttons.append(card)
+
+func _load_art_texture(art_path: String) -> Texture2D:
+    if art_path.is_empty():
+        return null
+    if art_path.begins_with("res://"):
+        return load(art_path)
+    if not FileAccess.file_exists(art_path):
+        return null
+    var image := Image.load_from_file(art_path)
+    if image == null or image.is_empty():
+        return null
+    return ImageTexture.create_from_image(image)
 
 func _cutout_mode_for_art(art_path: String) -> int:
     if art_path.contains("cutout"):
@@ -360,10 +391,15 @@ func _select(index: int, immediate := false) -> void:
         return
     selected = posmod(index, buttons.size())
     var focus_item: Dictionary = buttons[selected].get_meta("item", {})
-    detail.text = str(focus_item.get("subtitle", ""))
-    selection_label.text = "—  %s  —" % str(focus_item.get("hint", "Choose your next adventure"))
+    var subtitle := str(focus_item.get("subtitle", ""))
+    var hint := str(focus_item.get("hint", ""))
+    var header_hint := str(focus_item.get("header_hint", hint))
+    detail.text = subtitle
+    detail.visible = not subtitle.is_empty()
+    selection_label.text = "" if header_hint.is_empty() else "—  %s  —" % header_hint
+    selection_label.visible = collection_label.visible and not header_hint.is_empty()
     arcade_fx.set_accent(Color(str(focus_item.get("color", "f2a93b"))))
-    footer.text = "BROWSE     SELECT     BACK     %s" % str(focus_item.get("hint", ""))
+    footer.text = "BROWSE     SELECT     BACK" if hint.is_empty() else "BROWSE     SELECT     BACK     %s" % hint
     for card in buttons:
         var offset := _carousel_offset(int(card.get_meta("index", 0)), selected, buttons.size())
         var distance: int = absi(offset)
@@ -436,8 +472,13 @@ func _set_card_typography(card: Button, selected_card: bool, distance: int) -> v
     var count_label_node: Label = card.get_meta("count_label_node") if card.has_meta("count_label_node") else null
     if count_label_node != null:
         count_label_node.add_theme_font_size_override("font_size", 18 if selected_card else 14 if distance == 1 else 12)
+    var caption_node: Label = card.get_meta("caption_node") if card.has_meta("caption_node") else null
+    if caption_node != null:
+        caption_node.visible = selected_card or distance == 1
+        caption_node.add_theme_font_size_override("font_size", 20 if selected_card else 14)
     var art_node: Control = card.get_meta("art_node", null)
     if art_node != null:
+        _update_external_card_art(card, distance)
         var is_cutout := bool(card.get_meta("is_cutout", false))
         art_node.custom_minimum_size.y = 270.0 if selected_card and is_cutout else 205.0 if selected_card else 160.0 if distance == 1 and is_cutout else 130.0 if distance == 1 else 110.0 if is_cutout else 88.0
         art_node.modulate.a = 1.0 if selected_card else 0.90 if distance == 1 else 0.72
@@ -453,6 +494,15 @@ func _set_card_typography(card: Button, selected_card: bool, distance: int) -> v
         mark_node.add_theme_font_size_override("font_size", 58 if selected_card and long_mark else 108 if selected_card else 42 if distance == 1 and long_mark else 72 if distance == 1 else 30 if long_mark else 50)
         mark_node.add_theme_constant_override("outline_size", 18 if selected_card else 11 if distance == 1 else 7)
         mark_node.add_theme_color_override("font_outline_color", Color(AMBER if selected_card else accent, 0.78 if selected_card else 0.42))
+
+func _update_external_card_art(card: Button, distance: int) -> void:
+    if not card.has_meta("external_art_path"):
+        return
+    var art_node: TextureRect = card.get_meta("art_node")
+    if distance <= 2 and art_node.texture == null:
+        art_node.texture = _load_art_texture(str(card.get_meta("external_art_path")))
+    elif distance > 2 and art_node.texture != null:
+        art_node.texture = null
 
 func _set_visual_mode(in_library: bool, next_items: Array) -> void:
     var in_streaming := current_menu_path.to_upper().contains("STREAMING")
@@ -481,6 +531,8 @@ func _set_visual_mode(in_library: bool, next_items: Array) -> void:
         collection_label.text = "%d GAMES ONLINE" % total_games if total_games > 0 else "ARCADE LINK ACTIVE"
 
 func _activate(item: Dictionary, card: Button) -> void:
+    if not _can_accept_navigation_input():
+        return
     last_button = card
     var kind := str(item.get("type", ""))
     if kind == "panel":
@@ -512,10 +564,14 @@ func _activate(item: Dictionary, card: Button) -> void:
     if not executable.begins_with("/opt/hearth/launchers/") or not FileAccess.file_exists(executable):
         _show_error("The launcher is missing. Deploy this source version before starting applications.")
         return
-    child_pid = OS.create_process(executable, item.get("args", []))
-    if child_pid <= 0:
+    var launched_pid := OS.create_process(executable, item.get("args", []))
+    if launched_pid <= 0:
         _show_error("The selected application could not start.")
         return
+    if bool(item.get("detached", false)):
+        footer.text = "%s opened" % str(item.get("label", "Application"))
+        return
+    child_pid = launched_pid
     footer.text = "%s is running…" % str(item.get("label", "Application"))
 
 func _library_systems() -> Array:
@@ -556,7 +612,7 @@ func _library_systems() -> Array:
                 family_systems.append(_system_item(system, games))
                 family_game_count += games.size()
         if not family_systems.is_empty():
-            family_items.append({"id":str(family.get("id", "family")),"label":str(family.get("label", "Systems")),"brand":str(family.get("brand", "")),"art":str(family.get("art", "")),"subtitle":"%d systems • %d game%s" % [family_systems.size(), family_game_count, "" if family_game_count == 1 else "s"],"count_label":"%d game%s" % [family_game_count, "" if family_game_count == 1 else "s"],"game_count":family_game_count,"hint":"Choose a system","mark":str(family.get("mark", "•")),"color":str(family.get("color", "426d8d")),"type":"submenu","children":family_systems,"enabled":true})
+            family_items.append({"id":str(family.get("id", "family")),"label":str(family.get("label", "Systems")),"art":str(family.get("art", "")),"subtitle":"%d systems • %d game%s" % [family_systems.size(), family_game_count, "" if family_game_count == 1 else "s"],"count_label":"%d game%s" % [family_game_count, "" if family_game_count == 1 else "s"],"game_count":family_game_count,"hint":"Choose a family","header_hint":"Choose a family","mark":str(family.get("mark", "•")),"color":str(family.get("color", "426d8d")),"type":"submenu","children":family_systems,"enabled":true})
     if not unknown.is_empty():
         var unknown_systems: Array = []
         var unmapped_game_count := 0
@@ -564,13 +620,14 @@ func _library_systems() -> Array:
             var unknown_game_count: int = unknown[folder].size()
             unmapped_game_count += unknown_game_count
             unknown_systems.append({"id":"unmapped-" + str(folder),"label":str(folder).replace("_", " ").replace("-", " ").capitalize(),"subtitle":"%d game%s • emulator not assigned" % [unknown_game_count, "" if unknown_game_count == 1 else "s"],"count_label":"%d game%s" % [unknown_game_count, "" if unknown_game_count == 1 else "s"],"hint":"Add this folder to system-registry.json","mark":"?","color":"5e6470","type":"submenu","children":unknown[folder],"enabled":true})
-        family_items.append({"id":"unmapped","label":"Unmapped Library","subtitle":"%d folders • %d game%s" % [unknown_systems.size(), unmapped_game_count, "" if unmapped_game_count == 1 else "s"],"count_label":"%d game%s" % [unmapped_game_count, "" if unmapped_game_count == 1 else "s"],"game_count":unmapped_game_count,"hint":"Nothing is hidden","mark":"?","color":"5e6470","type":"submenu","children":unknown_systems,"enabled":true})
+        family_items.append({"id":"unmapped","label":"Unmapped Library","subtitle":"%d folders • %d game%s" % [unknown_systems.size(), unmapped_game_count, "" if unmapped_game_count == 1 else "s"],"count_label":"%d game%s" % [unmapped_game_count, "" if unmapped_game_count == 1 else "s"],"game_count":unmapped_game_count,"hint":"Choose a family","header_hint":"Choose a family","mark":"?","color":"5e6470","type":"submenu","children":unknown_systems,"enabled":true})
     return family_items
 
 func _system_item(system: Dictionary, games: Array) -> Dictionary:
     var count := games.size()
     var art_path := str(system.get("art", ""))
-    return {"id":str(system.get("id", "system")),"label":str(system.get("label", "System")),"subtitle":"%d game%s • %s" % [count, "" if count == 1 else "s", str(system.get("emulator_label", "RetroArch"))],"count_label":"%d game%s" % [count, "" if count == 1 else "s"],"game_count":count,"art":art_path,"art_fit":"contain","hint":"Choose a game","mark":str(system.get("mark", "•")),"color":str(system.get("color", "426d8d")),"type":"submenu","children":games,"enabled":true}
+    var system_label := str(system.get("label", "System"))
+    return {"id":str(system.get("id", "system")),"label":system_label,"subtitle":"%d game%s available" % [count, "" if count == 1 else "s"],"caption":system_label,"game_count":count,"art":art_path,"art_fit":"contain","hint":"Choose a game","header_hint":"","mark":str(system.get("mark", "•")),"color":str(system.get("color", "426d8d")),"type":"submenu","children":games,"enabled":true}
 
 func _scan_system_folder(folder_path: String, system: Dictionary, games: Array, depth := 0, scan_children := true) -> void:
     if depth > 3:
@@ -583,14 +640,19 @@ func _scan_system_folder(folder_path: String, system: Dictionary, games: Array, 
         var extension := filename.get_extension().to_lower()
         var full_path := folder_path.path_join(filename)
         var core := str(system.get("core", ""))
-        var core_available := not core.is_empty() and FileAccess.file_exists("/usr/lib64/libretro/" + core)
+        var core_available := not _retroarch_core_path(core).is_empty()
         var supported := not system.is_empty() and core_available
-        var game: Dictionary = {"id":"rom-" + full_path.sha256_text().left(12),"label":filename.get_basename().replace("_", " "),"subtitle":"%s • .%s" % [str(system.get("label", "Unmapped ROM")), extension],"hint":"Cross launches this game" if supported else "This system's emulator is not installed yet","mark":str(system.get("mark", extension.to_upper().left(4))),"color":str(system.get("color", "5e6470")),"type":"command" if supported else "unavailable","enabled":true}
+        var game_title := _clean_game_title(filename)
+        var game: Dictionary = {"id":"rom-" + full_path.sha256_text().left(12),"label":game_title,"caption":game_title,"subtitle":"","hint":"","header_hint":"","mark":str(system.get("mark", extension.to_upper().left(4))),"color":str(system.get("color", "5e6470")),"type":"command" if supported else "unavailable","enabled":true}
+        var game_art := _find_game_art(folder_path, filename, system)
+        if not game_art.is_empty():
+            game["art"] = game_art
+            game["art_mode"] = "cover"
         if supported:
             game["executable"] = "/opt/hearth/launchers/retroarch-game.sh"
             game["args"] = [core, full_path]
         else:
-            game["error"] = "Hearth found %s. %s is configured for %s, but the required core (%s) is not installed in /usr/lib64/libretro yet." % [filename, str(system.get("label", "this folder")), str(system.get("emulator_label", "RetroArch")), core if not core.is_empty() else "none"]
+            game["error"] = "Hearth found %s. %s is configured for %s, but the required core (%s) is not installed yet." % [filename, str(system.get("label", "this folder")), str(system.get("emulator_label", "RetroArch")), core if not core.is_empty() else "none"]
         games.append(game)
     if not scan_children:
         return
@@ -600,10 +662,124 @@ func _scan_system_folder(folder_path: String, system: Dictionary, games: Array, 
         if not child.begins_with("."):
             _scan_system_folder(folder_path.path_join(child), system, games, depth + 1)
 
+func _clean_game_title(filename: String) -> String:
+    var title := filename.get_basename()
+    for compound_suffix in [".nkit", ".rvz", ".iso"]:
+        if title.to_lower().ends_with(compound_suffix):
+            title = title.substr(0, title.length() - compound_suffix.length())
+    title = title.replace("_", " ").strip_edges()
+    var tag_start := title.find(" (")
+    var bracket_start := title.find(" [")
+    if bracket_start >= 0 and (tag_start < 0 or bracket_start < tag_start):
+        tag_start = bracket_start
+    if tag_start > 0:
+        title = title.left(tag_start)
+    return title.strip_edges()
+
+func _retroarch_core_path(core_file: String) -> String:
+    if core_file.is_empty() or not core_file.ends_with("_libretro.so") or core_file.get_file() != core_file:
+        return ""
+    for core_root: String in [_user_retroarch_core_root(), SYSTEM_CORE_ROOT]:
+        if not core_root.is_empty():
+            var candidate: String = core_root.path_join(core_file)
+            if FileAccess.file_exists(candidate):
+                return candidate
+    return ""
+
+func _user_retroarch_core_root() -> String:
+    var config_home := OS.get_environment("XDG_CONFIG_HOME")
+    if config_home.is_empty():
+        var home_dir := OS.get_environment("HOME")
+        if home_dir.is_empty():
+            return ""
+        config_home = home_dir.path_join(".config")
+    return config_home.path_join("retroarch").path_join("cores")
+
+func _find_game_art(folder_path: String, filename: String, system: Dictionary) -> String:
+    var raw_stem := filename.get_basename()
+    var compound_stem := raw_stem
+    for compound_suffix in [".nkit", ".rvz", ".iso"]:
+        if compound_stem.to_lower().ends_with(compound_suffix):
+            compound_stem = compound_stem.substr(0, compound_stem.length() - compound_suffix.length())
+    var stems: Array[String] = [raw_stem]
+    if compound_stem != raw_stem:
+        stems.append(compound_stem)
+    for subfolder in ["", "covers", "media", "artwork"]:
+        var art_folder := folder_path if subfolder.is_empty() else folder_path.path_join(subfolder)
+        for stem in stems:
+            var sidecar := _first_image_with_stem(art_folder, stem)
+            if not sidecar.is_empty():
+                return sidecar
+    var thumbnail_dbs: Array = system.get("thumbnail_dbs", [])
+    var single_thumbnail_db := str(system.get("thumbnail_db", ""))
+    if thumbnail_dbs.is_empty() and not single_thumbnail_db.is_empty():
+        thumbnail_dbs = [single_thumbnail_db]
+    if thumbnail_dbs.is_empty():
+        return ""
+    var thumbnail_roots: Array[String] = []
+    var thumbnail_root := _retroarch_thumbnail_root()
+    if not thumbnail_root.is_empty():
+        thumbnail_roots.append(thumbnail_root)
+    var artwork_pack_root := _artwork_pack_root()
+    if not artwork_pack_root.is_empty():
+        thumbnail_roots.append(artwork_pack_root)
+    var thumbnail_stems: Array[String] = []
+    for stem in stems:
+        var safe_stem := _safe_thumbnail_name(stem)
+        if not thumbnail_stems.has(safe_stem):
+            thumbnail_stems.append(safe_stem)
+    var short_title := _safe_thumbnail_name(_clean_game_title(filename))
+    if not short_title.is_empty() and not thumbnail_stems.has(short_title):
+        thumbnail_stems.append(short_title)
+    for thumbnail_db_value in thumbnail_dbs:
+        var database_name := str(thumbnail_db_value)
+        for root_path in thumbnail_roots:
+            var database_folder := database_name if root_path == thumbnail_root else database_name.replace(" ", "_")
+            for thumbnail_type in ["Named_Boxarts", "Named_Titles", "Named_Snaps"]:
+                var art_folder := root_path.path_join(database_folder).path_join(thumbnail_type)
+                for stem in thumbnail_stems:
+                    var cached_art := _first_image_with_stem(art_folder, stem)
+                    if not cached_art.is_empty():
+                        return cached_art
+    return ""
+
+func _first_image_with_stem(folder_path: String, stem: String) -> String:
+    for image_extension in ["png", "jpg", "jpeg", "webp"]:
+        var candidate := folder_path.path_join(stem + "." + image_extension)
+        if FileAccess.file_exists(candidate):
+            return candidate
+    return ""
+
+func _retroarch_thumbnail_root() -> String:
+    var config_home := OS.get_environment("XDG_CONFIG_HOME")
+    if config_home.is_empty():
+        var home_dir := OS.get_environment("HOME")
+        if home_dir.is_empty():
+            return ""
+        config_home = home_dir.path_join(".config")
+    return config_home.path_join("retroarch").path_join("thumbnails")
+
+func _artwork_pack_root() -> String:
+    var data_home := OS.get_environment("XDG_DATA_HOME")
+    if data_home.is_empty():
+        var home_dir := OS.get_environment("HOME")
+        if home_dir.is_empty():
+            return ""
+        data_home = home_dir.path_join(".local").path_join("share")
+    return data_home.path_join("hearth").path_join("artwork-packs")
+
+func _safe_thumbnail_name(value: String) -> String:
+    var safe := value
+    for invalid_character in ["&", "*", "/", ":", "\"", "<", ">", "?", "\\", "|"]:
+        safe = safe.replace(invalid_character, "_")
+    return safe
+
 func _is_library_metadata(filename: String) -> bool:
     return filename.get_extension().to_lower() in ["md", "txt", "nfo", "json", "xml", "jpg", "jpeg", "png", "webp"]
 
 func _unhandled_input(event: InputEvent) -> void:
+    if not _can_accept_navigation_input():
+        return
     if input_settings.visible:
         input_settings.handle_unhandled_input(event)
         get_viewport().set_input_as_handled()
@@ -627,6 +803,13 @@ func _unhandled_input(event: InputEvent) -> void:
         _select(selected + 1)
     elif input_manager.action_pressed(event, "select") and selected >= 0 and selected < buttons.size():
         _activate(buttons[selected].get_meta("item", {}), buttons[selected])
+
+func _notification(what: int) -> void:
+    if what == NOTIFICATION_APPLICATION_FOCUS_IN:
+        input_rearm_at_msec = Time.get_ticks_msec() + 450
+
+func _can_accept_navigation_input() -> bool:
+    return DisplayServer.window_is_focused() and Time.get_ticks_msec() >= input_rearm_at_msec
 
 func _on_input_settings_closed() -> void:
     footer.text = "Returned to Hearth"
@@ -654,7 +837,7 @@ func _process(delta: float) -> void:
             visual_root.position.y = lerpf(visual_root.position.y, 0.0, minf(1.0, delta * 9.0))
     if child_pid > 0 and not OS.is_process_running(child_pid):
         child_pid = -1
-        footer.text = "Returned home safely"
+        footer.text = "Returned to Hearth"
         if is_instance_valid(last_button):
             last_button.grab_focus()
 
