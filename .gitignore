@@ -6,6 +6,10 @@ browser-profiles/
 secrets/
 rollback/system-backups/
 library/
+!launcher/scenes/library/
+!launcher/scenes/library/**
+!launcher/scripts/library/
+!launcher/scripts/library/**
 roms/
 bios/
 saves/

@@ -15,7 +15,7 @@ for dependency in curl unzip; do
 done
 
 mkdir -p "${system_root}"
-for archive_name in Dolphin.zip blueMSX.zip LRPS2.zip; do
+for archive_name in Dolphin.zip blueMSX.zip LRPS2.zip PPSSPP.zip; do
   archive_path="${staging_root}/${archive_name}"
   printf 'Downloading generic support assets: %s\n' "${archive_name}"
   curl --fail --location --retry 3 --connect-timeout 10 \
@@ -35,4 +35,5 @@ done
 test -s "${system_root}/dolphin-emu/Sys/GC/dsp_rom.bin"
 test -s "${system_root}/Machines/COL - ColecoVision/config.ini"
 test -s "${system_root}/pcsx2/resources/GameIndex.yaml"
+test -s "${system_root}/PPSSPP/ppge_atlas.zim"
 printf 'RetroArch support assets are ready under %s.\n' "${system_root}"

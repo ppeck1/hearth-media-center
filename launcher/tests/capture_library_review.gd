@@ -22,24 +22,34 @@ func _capture_all() -> void:
     _save("settings.png")
 
     var families: Array = hearth._library_systems()
-    await hearth._show_menu(families, "My Library", "HEARTH  ›  MY LIBRARY")
+    hearth.library_activity_store.reload()
+    hearth.library_browser.open_library(families, hearth.library_activity_store)
     await _settle()
-    _save("families.png")
+    _save("library-home.png")
 
     var nintendo: Dictionary = _item_with_id(families, "nintendo")
     var nintendo_systems: Array = nintendo.get("children", [])
-    await hearth._show_menu(nintendo_systems, "Nintendo", "HEARTH  ›  MY LIBRARY  ›  NINTENDO", 3)
+    hearth.library_browser._current_family = nintendo
+    hearth.library_browser._drawer_level = 1
+    hearth.library_browser._drawer_index = 0
+    hearth.library_browser._build_drawer()
     await _settle()
-    _save("systems.png")
+    _save("nintendo-drawer.png")
 
     var n64: Dictionary = _item_with_id(nintendo_systems, "n64")
-    await hearth._show_menu(
-        n64.get("children", []),
-        str(n64.get("label", "Nintendo 64")),
-        "HEARTH  ›  MY LIBRARY  ›  NINTENDO  ›  NINTENDO 64"
-    )
+    hearth.library_browser._show_system(n64)
     await _settle()
-    _save("games.png")
+    _save("n64-games.png")
+
+    var pc: Dictionary = _item_with_id(families, "pc")
+    var pc_games: Dictionary = _item_with_id(pc.get("children", []), "pc-games")
+    hearth.library_browser._current_family = pc
+    hearth.library_browser._drawer_level = 1
+    hearth.library_browser._drawer_index = 1
+    hearth.library_browser._build_drawer()
+    hearth.library_browser._show_system(pc_games)
+    await _settle()
+    _save("pc-games.png")
 
     print("Library review screenshots captured in " + OUTPUT_DIRECTORY)
     quit(0)
