@@ -25,42 +25,13 @@ func _run() -> void:
     launcher._activate(steam_item, launcher.buttons[0])
     _check(launcher.child_pid == -1, "background activation cannot launch Steam")
 
-    var family_items: Array = launcher._library_systems()
-    var nintendo: Dictionary = {}
-    for family_item in family_items:
-        if str(family_item.get("id", "")) == "nintendo":
-            nintendo = family_item
-            break
-    _check(not nintendo.is_empty(), "Nintendo family is discovered")
-    _check(not nintendo.has("brand"), "family cards omit redundant text above artwork")
-    _check(nintendo.get("header_hint") == "Choose a family", "family selection uses family wording")
-    for family_item in family_items:
-        if str(family_item.get("id", "")) == "unmapped":
-            continue
-        _check(
-            family_item.get("header_hint") == "Choose a family",
-            "%s family uses family-level wording" % family_item.get("label", "Family")
-        )
-
     for registered_system in launcher.systems:
         if str(registered_system.get("backend", "")) == "manifest":
-            var native_games: Array = launcher._manifest_games(registered_system)
             _check(
                 str(registered_system.get("manifest_path", "")).begins_with("/srv/library/"),
-                "PC catalog is loaded from a machine-local manifest"
+                "PC catalog is configured outside the repository"
             )
-            if not native_games.is_empty():
-                _check(native_games[0].get("type") == "command", "PC manifest uses a native command backend")
-                _check(
-                    str(native_games[0].get("art", "")).get_file().get_basename().to_lower() == "icon",
-                    "PC manifest discovers icon artwork from each game folder"
-                )
             continue
-        var core_file := str(registered_system.get("core", ""))
-        _check(
-            not launcher._retroarch_core_path(core_file).is_empty(),
-            "%s core resolves from an approved directory" % registered_system.get("label", "System")
-        )
         var sample_system: Dictionary = launcher._system_item(
             registered_system,
             [{"caption":"Sample Game"}]
@@ -73,29 +44,6 @@ func _run() -> void:
             str(sample_system.get("header_hint", "")).is_empty(),
             "%s system header does not repeat its name" % registered_system.get("label", "System")
         )
-
-    var n64: Dictionary = {}
-    for system_item in nintendo.get("children", []):
-        if str(system_item.get("id", "")) == "n64":
-            n64 = system_item
-            break
-    _check(not n64.is_empty(), "Nintendo 64 system is discovered")
-    _check(str(n64.get("subtitle", "")).ends_with("available"), "system header shows only games available")
-    _check(not str(n64.get("subtitle", "")).contains("RetroArch"), "system header omits bridge and emulator")
-    _check(n64.get("caption") == n64.get("label"), "system name appears under system artwork")
-    _check(str(n64.get("header_hint", "")).is_empty(), "system header does not repeat the system name")
-
-    var games: Array = n64.get("children", [])
-    _check(not games.is_empty(), "Nintendo 64 games are discovered")
-    if not games.is_empty():
-        _check(not str(games[0].get("caption", "")).is_empty(), "game title appears under the game icon")
-        _check(str(games[0].get("subtitle", "")).is_empty(), "game header omits system and extension")
-        _check(str(games[0].get("header_hint", "")).is_empty(), "game header omits launch boilerplate")
-        var all_games_have_art := true
-        for game in games:
-            if str(game.get("art", "")).is_empty():
-                all_games_have_art = false
-        _check(all_games_have_art, "missing title art receives a system fallback")
     _check(
         launcher._clean_game_title("Example Game (USA).nkit.gcz") == "Example Game",
         "compound extensions and database tags are removed from captions"

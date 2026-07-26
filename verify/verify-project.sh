@@ -1,6 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+mode="${1:---ci}"
+case "${mode}" in
+  --ci|--fedora|--hardware) ;;
+  *)
+    printf 'Usage: %s [--ci|--fedora|--hardware]\n' "$0" >&2
+    exit 64
+    ;;
+esac
+
+if [[ "${mode}" == "--hardware" ]]; then
+  printf '%s\n' \
+    'Hardware validation is intentionally manual and unclaimed.' \
+    'Follow docs/hardware-validation.md on the dedicated Fedora appliance.'
+  exit 0
+fi
+
+printf 'Hearth verification mode: %s\n' "${mode#--}"
 jq -e '.schema_version == 2 and (.items | type == "array")' "${root}/launcher/config/menu.json" >/dev/null
 jq -e '.title == "Home"' "${root}/launcher/config/menu.json" >/dev/null
 jq -e '
@@ -33,8 +51,10 @@ for launcher in "${root}"/launchers/*.sh; do
   bash -n "${launcher}"
   test -x "${launcher}"
 done
-bash -n "${root}/deploy/fedora/install-input-access.sh"
-test -x "${root}/deploy/fedora/install-input-access.sh"
+for deployment_script in "${root}"/deploy/fedora/*.sh; do
+  bash -n "${deployment_script}"
+  test -x "${deployment_script}"
+done
 test -f "${root}/deploy/fedora/69-hearth-uinput.rules"
 test -f "${root}/deploy/fedora/hearth-uinput.conf"
 rg -q 'TAG\+="uaccess"' "${root}/deploy/fedora/69-hearth-uinput.rules"
@@ -101,14 +121,29 @@ done
 test -f "${root}/input_bridge/tests/test_linux_runtime.py"
 python3 -m compileall -q "${root}/input_bridge"
 PYTHONPATH="${root}" python3 -m unittest discover -s "${root}/input_bridge/tests"
-if command -v godot >/dev/null 2>&1; then
-  godot --headless --path "${root}/launcher" --import
-  godot --headless --path "${root}/launcher" --script res://tests/menu_smoke.gd
-  godot --headless --path "${root}/launcher" --script res://tests/input_smoke.gd
-  godot --headless --path "${root}/launcher" --script res://tests/library_smoke.gd
-  godot --headless --path "${root}/launcher" --script res://tests/library_browser_smoke.gd
-  godot --headless --path "${root}/launcher" --script res://tests/library_settings_smoke.gd
+godot_bin="${HEARTH_GODOT:-}"
+if [[ -z "${godot_bin}" ]] && command -v godot >/dev/null 2>&1; then
+  godot_bin="$(command -v godot)"
 fi
+if [[ -z "${godot_bin}" && "${mode}" == "--fedora" && -x /opt/hearth/runtime/godot ]]; then
+  godot_bin="/opt/hearth/runtime/godot"
+fi
+if [[ -z "${godot_bin}" || ! -x "${godot_bin}" ]]; then
+  printf '%s\n' \
+    'Godot 4 is required for verification.' \
+    'Set HEARTH_GODOT=/path/to/godot, add godot to PATH, or use --fedora with /opt/hearth/runtime/godot.' >&2
+  exit 1
+fi
+"${godot_bin}" --headless --path "${root}/launcher" --import
+for smoke_test in \
+  menu_smoke.gd \
+  input_smoke.gd \
+  library_smoke.gd \
+  library_browser_smoke.gd \
+  library_settings_smoke.gd \
+  activity_store_smoke.gd; do
+  "${godot_bin}" --headless --path "${root}/launcher" --script "res://tests/${smoke_test}"
+done
 test -f "${root}/launcher/assets/backgrounds/arcade-living-room-v4.png"
 rg -q 'res://assets/backgrounds/arcade-living-room-v4.png' "${root}/launcher/scripts/main.gd"
 rg -q 'Time.get_time_dict_from_system\(\)' "${root}/launcher/scripts/main.gd"
@@ -123,12 +158,17 @@ if rg -n -e '<image' -e 'data:image' "${root}/launcher/assets/logos/"*'-panel-v1
   printf '%s\n' 'Raster content found in a streaming panel.' >&2
   exit 1
 fi
-home_marker="/home""/p""a""u""l"
-name_marker="p""a""u""l"
-account_marker="p""p""e""c""k""1"
 absolute_home_marker="/h""ome/"
-if rg -n -i -e "${home_marker}" -e "\\b${name_marker}\\b" -e "${account_marker}" -e "${absolute_home_marker}" "${root}" --glob '!.git/**' --glob '!launcher/.godot/**'; then
+if rg -n -i -e "${absolute_home_marker}" -e 'C:\\Users\\' -e 'BEGIN [A-Z ]*PRIVATE KEY' -e '\bsk-[A-Za-z0-9_-]{20,}\b' "${root}" --glob '!.git/**' --glob '!launcher/.godot/**'; then
   printf '%s\n' 'Personal information marker found.' >&2
   exit 1
+fi
+python3 "${root}/verify/check_repository.py"
+if command -v shellcheck >/dev/null 2>&1; then
+  mapfile -d '' shell_scripts < <(git -C "${root}" ls-files -z '*.sh')
+  shellcheck "${shell_scripts[@]/#/${root}/}"
+fi
+if [[ "${mode}" == "--fedora" ]]; then
+  "${root}/deploy/fedora/doctor.sh"
 fi
 printf '%s\n' 'Static verification passed.'
