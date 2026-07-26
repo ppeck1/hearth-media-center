@@ -9,6 +9,7 @@ This is the complete customization map for Hearth. Use the UI for ordinary chang
 | Show or hide an existing streaming service | **Movies & TV → Manage Services** |
 | Change folder icons, wallpapers, hierarchy, fullscreen mode, or RetroArch core | **Settings → Library & Launchers** |
 | Remap a controller or remote | **Settings → Controllers and Remotes** |
+| Inspect appliance status and remediation | **Settings → System Health** |
 | Add a ROM system or folder alias | [`system-registry.json`](../launcher/config/system-registry.json) |
 | Add a native PC game | `/srv/library/games/pc/hearth-manifest.json` plus an allowlisted launch helper |
 | Add a top-level destination or streaming provider | [`menu.json`](../launcher/config/menu.json) |
@@ -132,7 +133,7 @@ Menu item fields:
 | `executable` | for command | absolute path | — | Must resolve below `/opt/hearth/launchers` at runtime |
 | `args` | no | string array | `[]` | Arguments passed without shell evaluation |
 | `detached` | no | boolean | `false` | Records a launch and returns immediately |
-| `panel_id` | for panel | string | — | `library_settings`, `input_settings`, or `streaming_services` |
+| `panel_id` | for panel | string | — | `library_settings`, `input_settings`, `streaming_services`, or bounded `system_health` |
 | `manageable_service` | no | boolean | `false` | Includes the destination in Movies & TV service management |
 
 ## `system-registry.json`
@@ -222,8 +223,10 @@ Recommended layout:
 | `XDG_CONFIG_HOME` | settings, RetroArch, browser launchers, bridge | `$HOME/.config` | Moves Hearth settings, RetroArch user cores, and per-service browser profiles |
 | `XDG_DATA_HOME` | artwork tool and lookup | `$HOME/.local/share` | Base for downloaded Hearth artwork packs |
 | `HEARTH_ARTWORK_PACK_ROOT` | artwork sync tool | `$XDG_DATA_HOME/hearth/artwork-packs` | Overrides the whole-system artwork-pack root |
-| `XDG_STATE_HOME` | maintenance launcher | `$HOME/.local/state` | Base for appliance maintenance state |
+| `XDG_STATE_HOME` | maintenance and diagnostic helpers | `$HOME/.local/state` | Base for appliance state and the atomic System Health report |
 | `PYTHONPATH` | input bridge launcher | existing value, if any | Existing value is preserved after prepending `/opt/hearth/input_bridge` |
+| `HEARTH_GODOT` | verifier and doctor | `godot` on `PATH`, then Fedora installed runtime | Selects a specific Godot executable for verification/diagnostics; not read by the Godot UI |
+| `HEARTH_DIAGNOSTIC_REPORT` | Godot diagnostic tests | XDG state report | Test-only fixture path used by the headless System Health smoke test |
 
 These variables change storage roots only. They do not broaden the executable, ROM-path, core-path, or input-output allowlists.
 
@@ -237,6 +240,7 @@ These variables change storage roots only. They do not broaden the executable, R
 | `devilutionx-game.sh` | `diablo` or `hellfire` | exact mode allowlist | Starts the matching DevilutionX mode |
 | `browser-service.sh` | `SERVICE_ID URL [DESTINATION_ID]` | fixed Chrome binary and deployed extension | Starts an isolated fullscreen service profile |
 | `run-with-input-bridge.sh` | `DESTINATION_ID COMMAND...` | destination policy and adapter config | Supervises one external application session |
+| `system-health-refresh.sh` | none | fixed doctor path and fixed XDG state output | Atomically refreshes the privacy-bounded health report |
 
 ## Input policy matrix
 
@@ -266,3 +270,5 @@ These are code constants rather than user variables:
 | Folder recursion limit | 8 nested levels below a system root | [`main.gd`](../launcher/scripts/main.gd) |
 | External cover texture cache | 64 images | [`library_browser.gd`](../launcher/scripts/library/library_browser.gd) |
 | Screenshot/reference resolution | 1920×1080 | [`hearth.sh`](../launchers/hearth.sh) |
+| Diagnostic helper | `/opt/hearth/launchers/system-health-refresh.sh` | [`system_health.gd`](../launcher/scripts/diagnostics/system_health.gd) |
+| Diagnostic report | `${XDG_STATE_HOME:-$HOME/.local/state}/hearth/system-health.json` | [`health_report.gd`](../launcher/scripts/diagnostics/health_report.gd) |

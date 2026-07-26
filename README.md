@@ -3,8 +3,11 @@
 ![Godot 4](https://img.shields.io/badge/Godot-4-478CBF?logo=godot-engine&logoColor=white)
 ![Fedora target](https://img.shields.io/badge/target-Fedora%20Linux-51A2DA?logo=fedora&logoColor=white)
 ![Controller first](https://img.shields.io/badge/input-controller%20first-F2A93B)
+[![Verify](https://github.com/ppeck1/hearth-media-center/actions/workflows/verify.yml/badge.svg)](https://github.com/ppeck1/hearth-media-center/actions/workflows/verify.yml)
 
 Hearth is a controller-first home screen for a living-room PC. It puts personal games, Steam Big Picture, Plex, streaming services, settings, and power controls behind one simple interface.
+
+> **Alpha status:** the software has portable automated verification and Fedora lifecycle tooling, but the dedicated-PC [hardware matrix](docs/hardware-validation.md) has not been run and a redistribution license has not been selected. Treat this as an internal alpha, not a finished household appliance.
 
 ![Hearth home screen](docs/images/home.png)
 
@@ -80,9 +83,13 @@ The screenshot catalog uses fictional entries. Personal ROM names and local medi
 
 All screenshots are rendered directly from the Godot project at 1920×1080 by [`capture_readme_screenshots.gd`](launcher/tests/capture_readme_screenshots.gd). The library screenshots use a privacy-safe fixture.
 
+![System Health screen with privacy-safe fixture statuses](docs/images/system-health.png)
+
+**System Health shows bounded status and remediation without personal inventory.**
+
 ## Add a personal game library
 
-Hearth scans `/srv/library/games/roms` whenever **Games → My Library** opens. There is no import database or rescan command.
+Hearth scans `/srv/library/games/roms` whenever **Games → My Library** opens. Choose **Refresh Library** in the library drawer to rescan without leaving it. There is no import database.
 
 Create one top-level folder per system:
 
@@ -143,6 +150,8 @@ Open **Settings → Controllers and Remotes** to:
 - remap every semantic action;
 - test, reset, and save the profile.
 
+Open **Settings → System Health** for a controller-accessible, privacy-bounded summary of the installation, runtimes, library count, input bridge, controller, display session, and launch-at-login service. It cannot run arbitrary commands and never renders personal filenames or credentials.
+
 Movies & TV has its own **Manage Services** tile. It changes the grid immediately and saves the selection locally.
 
 ## Controls
@@ -152,10 +161,12 @@ Movies & TV has its own **Manage Services** tile. It changes the grid immediatel
 | Browse | D-pad or left stick | Arrow keys |
 | Select | Cross / south face button | Enter |
 | Back | Circle / east face button | Escape |
-| Previous / next screen | L1 / R1 or L3 / R3 | Page Up / Page Down |
+| Previous / next screen or page jump | L1 / R1 or L3 / R3 | Page Up / Page Down |
 | Menu | Options | Menu |
 | Play / pause | Triangle or touchpad | Media Play/Pause |
 | Return to Hearth | PS / Guide | Home |
+
+L1/R1 and L3/R3 currently emit the same semantic `page_left`/`page_right` actions. In Hearth they move by the active view’s page increment; in the Netflix adapter they become Page Up/Page Down for a fast vertical jump. There is no hidden shoulder-versus-stick-click distinction in the current code.
 
 ## Run for development
 
@@ -167,14 +178,38 @@ Requirements:
 - `python3-evdev` only for the live Fedora controller bridge.
 
 ```bash
-git clone https://github.com/OWNER/hearth-media-center.git
+git clone https://github.com/ppeck1/hearth-media-center.git
 cd hearth-media-center
 godot --path launcher
 ```
 
 The interface runs without ROMs, credentials, or the production filesystem. External applications stay unavailable until their `/opt/hearth/launchers` helpers exist.
 
-## Fedora appliance layout
+## Install on the Fedora appliance
+
+The installer reports required and optional dependencies but does not silently install Steam, RetroArch, Plex, Chrome, or unrelated system software.
+
+```bash
+sudo ./deploy/fedora/install.sh --dry-run --godot /path/to/godot
+sudo ./deploy/fedora/install.sh --godot /path/to/godot
+```
+
+After logging out and back in:
+
+```bash
+/opt/hearth/deploy/fedora/doctor.sh
+```
+
+Update and uninstall:
+
+```bash
+sudo ./deploy/fedora/update.sh --godot /path/to/godot
+sudo ./deploy/fedora/uninstall.sh
+```
+
+Updates create a timestamped application backup. Uninstall preserves `/srv/library`, Hearth settings, browser profiles, and backups unless the narrow `--remove-settings` option is explicitly used. See [Fedora deployment and rollback](docs/deployment.md) for exact procedures.
+
+### Fedora appliance layout
 
 | Purpose | Path |
 | --- | --- |
@@ -184,18 +219,6 @@ The interface runs without ROMs, credentials, or the production filesystem. Exte
 | Personal ROM library | `/srv/library/games/roms` |
 | Native PC catalog | `/srv/library/games/pc/hearth-manifest.json` |
 | System Libretro cores | `/usr/lib64/libretro` |
-
-A minimal manual deployment is:
-
-```bash
-sudo install -d /opt/hearth/runtime
-sudo cp -a launcher launchers input_bridge browser_extension deploy /opt/hearth/
-sudo install -m 0755 /path/to/godot /opt/hearth/runtime/godot
-sudo chmod +x /opt/hearth/launchers/*.sh
-sudo dnf install python3-evdev
-sudo /opt/hearth/deploy/fedora/install-input-access.sh
-/opt/hearth/launchers/hearth.sh
-```
 
 Optional destinations expect:
 
@@ -231,12 +254,23 @@ Local UI settings are stored below `${XDG_CONFIG_HOME:-$HOME/.config}/hearth` an
 - The bridge emits only configured, allowlisted keys and never runs as root.
 - Browser profiles, credentials, ROMs, BIOS files, saves, and media inventory stay outside the repository.
 
+The complete component flow and trust boundaries are in [Architecture](docs/architecture.md):
+
+```text
+controller / remote
+  → Godot Hearth
+  → validated helpers
+  → RetroArch, approved native apps, Steam, Plex, or browser
+  → optional unprivileged input bridge
+  → return to Hearth
+```
+
 ## Verify a change
 
 Run everything:
 
 ```bash
-PATH="/opt/hearth/runtime:$PATH" ./verify/verify-project.sh
+HEARTH_GODOT=/opt/hearth/runtime/godot ./verify/verify-project.sh --ci
 ```
 
 Or run individual suites:
@@ -247,17 +281,40 @@ godot --headless --path launcher --script res://tests/input_smoke.gd
 godot --headless --path launcher --script res://tests/library_smoke.gd
 godot --headless --path launcher --script res://tests/library_browser_smoke.gd
 godot --headless --path launcher --script res://tests/library_settings_smoke.gd
+godot --headless --path launcher --script res://tests/system_health_smoke.gd
+godot --headless --path launcher --script res://tests/activity_store_smoke.gd
 python3 -m unittest discover -s input_bridge/tests
+python3 -m unittest discover -s deploy/fedora/tests
 ```
 
-The complete verifier checks JSON schemas, artwork references, executable permissions, launcher syntax, privacy boundaries, bridge behavior, settings persistence, folder media discovery, and Godot scene parsing.
+The complete verifier checks JSON and configuration relationships, artwork references, executable modes, shell syntax, privacy boundaries, bridge behavior, atomic settings persistence, folder media discovery, documentation links, repository cleanliness, and Godot scene parsing.
+
+Verification is intentionally separated:
+
+| Class | How to run | What it means |
+| --- | --- | --- |
+| CI-safe | `./verify/verify-project.sh --ci` | Portable source, Python, Godot, docs, launcher, settings, and privacy checks |
+| Fedora-only | `/opt/hearth/verify/verify-project.sh --fedora` | CI-safe suite plus live appliance diagnostics |
+| Hardware-only | [Hardware validation](docs/hardware-validation.md) | Physical controller, TV, audio, suspend, launch/exit, and power evidence; never auto-passed |
+
+## Maintainer documentation
+
+- [Fedora installation, update, uninstall, and rollback](docs/deployment.md)
+- [Hardware validation matrix](docs/hardware-validation.md)
+- [Troubleshooting and privacy-safe logs](docs/troubleshooting.md)
+- [Architecture and trust boundaries](docs/architecture.md)
+- [Variable matrix](docs/variable-matrix.md)
+- [Demonstration capture](docs/demo.md)
+- [v0.1.0-alpha release draft](docs/releases/v0.1.0-alpha.md)
+- [Contributing](CONTRIBUTING.md)
 
 ## Current limitations
 
-- Deployment is manual and assumes the fixed `/opt/hearth` and `/srv/library` appliance paths.
+- Fedora is the only production deployment target; other distributions are untested and unsupported.
 - USB and Bluetooth identities still require validation on each target controller/remote combination.
 - Streaming behavior depends on external sites, applications, and active subscriptions.
 - GNOME Wayland cannot guarantee a persistent overlay above every fullscreen application.
-- No software license has been published yet; copyright remains with the repository owner.
+- The physical hardware matrix remains unrun for this alpha preparation.
+- [No redistribution license has been selected](LICENSE); copyright remains reserved until the maintainer decides.
 
 Brand names and service marks belong to their respective owners and are used only to identify compatible destinations.
