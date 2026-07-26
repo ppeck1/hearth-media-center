@@ -16,6 +16,14 @@ const VIDEO_CLUB_BACKGROUND_PATH := "res://assets/backgrounds/video-club-aisle-v
 const CONSOLE_GALLERY_BACKGROUND_PATH := "res://assets/backgrounds/console-gallery-v1.png"
 const ArcadeFx := preload("res://scripts/arcade_fx.gd")
 const LibraryActivityStore := preload("res://scripts/library/library_activity_store.gd")
+const StreamingServiceStore := preload("res://scripts/settings/streaming_service_store.gd")
+const LibrarySettingsStore := preload("res://scripts/settings/library_settings_store.gd")
+const TILE_GRID_COLUMNS := 3
+const TILE_GRID_VISIBLE_ROWS := 3
+const TILE_GRID_PAGE_SIZE := TILE_GRID_COLUMNS * TILE_GRID_VISIBLE_ROWS
+const TILE_GRID_CARD_SIZE := Vector2(480, 208)
+const TILE_GRID_ORIGIN := Vector2(216, 255)
+const TILE_GRID_STEP := Vector2(504, 224)
 const ART_SHADER_CODE := """
 shader_type canvas_item;
 
@@ -99,27 +107,47 @@ var card_phase := 0.0
 var card_tweens: Dictionary = {}
 var art_shader: Shader
 var artwork_indexes: Dictionary = {}
+var system_folder_art: Dictionary = {}
+var system_folder_wallpapers: Dictionary = {}
 var library_activity_store
+var streaming_service_store
+var library_settings_store
+var menu_root_items: Array = []
+var movies_tv_catalog: Array = []
 var current_menu_title := ""
 var current_menu_path := ""
+var current_menu_layout := "carousel"
 var input_rearm_at_msec := 0
 @onready var input_manager = $InputManager
 @onready var input_settings = $InputSettings
 @onready var library_browser = $LibraryBrowser
+@onready var streaming_services = $StreamingServices
+@onready var library_settings = $LibrarySettings
 
 func _ready() -> void:
     input_rearm_at_msec = Time.get_ticks_msec() + 450
     input_settings.closed.connect(_on_input_settings_closed)
     library_browser.launch_requested.connect(_on_library_launch_requested)
     library_browser.closed.connect(_on_library_closed)
+    streaming_services.save_requested.connect(_on_streaming_services_save_requested)
+    streaming_services.closed.connect(_on_streaming_services_closed)
+    library_settings.save_requested.connect(_on_library_settings_save_requested)
+    library_settings.closed.connect(_on_library_settings_closed)
     library_activity_store = LibraryActivityStore.new()
     library_activity_store.reload()
+    streaming_service_store = StreamingServiceStore.new()
+    library_settings_store = LibrarySettingsStore.new()
+    library_settings_store.load_settings()
     _build_ui()
     library_browser.z_index = 100
     input_settings.z_index = 100
+    streaming_services.z_index = 110
+    library_settings.z_index = 110
     modal.z_index = 200
     move_child(library_browser, get_child_count() - 1)
     move_child(input_settings, get_child_count() - 1)
+    move_child(streaming_services, get_child_count() - 1)
+    move_child(library_settings, get_child_count() - 1)
     move_child(modal, get_child_count() - 1)
     _load_registry()
     _load_home()
@@ -232,9 +260,17 @@ func _load_home() -> void:
     if typeof(parsed) != TYPE_DICTIONARY or parsed.get("schema_version", 0) != 2:
         _show_error("Hearth menu configuration is invalid.")
         return
-    _show_menu(parsed["items"], str(parsed.get("title", "Home")), HOME_MENU_PATH)
+    menu_root_items = parsed["items"].duplicate(true)
+    var movies_tv := _item_with_id(menu_root_items, "movies-tv")
+    movies_tv_catalog = movies_tv.get("children", []).duplicate(true)
+    var default_service_ids: Array[String] = []
+    for child_value in movies_tv_catalog:
+        if child_value is Dictionary and bool(child_value.get("manageable_service", false)):
+            default_service_ids.append(str(child_value.get("id", "")))
+    streaming_service_store.load(default_service_ids)
+    _show_menu(menu_root_items, str(parsed.get("title", "Home")), HOME_MENU_PATH)
 
-func _show_menu(next_items: Array, title: String, path: String, focus_index := 0) -> void:
+func _show_menu(next_items: Array, title: String, path: String, focus_index := 0, layout := "carousel") -> void:
     for tween in card_tweens.values():
         if tween is Tween and tween.is_valid():
             tween.kill()
@@ -246,6 +282,7 @@ func _show_menu(next_items: Array, title: String, path: String, focus_index := 0
     selected = 0
     current_menu_title = title
     current_menu_path = path
+    current_menu_layout = layout
     if current_menu_path == HOME_MENU_PATH:
         _update_clock()
     else:
@@ -256,6 +293,24 @@ func _show_menu(next_items: Array, title: String, path: String, focus_index := 0
             _add_card(item)
     await get_tree().process_frame
     _select(clampi(focus_index, 0, maxi(0, buttons.size() - 1)), true)
+
+func _movies_tv_items() -> Array:
+    var result: Array = []
+    for child_value in movies_tv_catalog:
+        if not child_value is Dictionary:
+            continue
+        var child: Dictionary = child_value
+        if bool(child.get("manageable_service", false)) and str(child.get("id", "")) not in streaming_service_store.enabled_ids:
+            continue
+        result.append(child.duplicate(true))
+    return result
+
+func _manageable_streaming_services() -> Array:
+    var result: Array = []
+    for child_value in movies_tv_catalog:
+        if child_value is Dictionary and bool(child_value.get("manageable_service", false)):
+            result.append(child_value.duplicate(true))
+    return result
 
 func _add_card(item: Dictionary) -> void:
     var card := Button.new()
@@ -403,6 +458,9 @@ func _focus_card(card: Button) -> void:
 func _select(index: int, immediate := false) -> void:
     if buttons.is_empty():
         return
+    if current_menu_layout == "tile_grid":
+        _select_tile_grid(index, immediate)
+        return
     selected = posmod(index, buttons.size())
     var focus_item: Dictionary = buttons[selected].get_meta("item", {})
     var subtitle := str(focus_item.get("subtitle", ""))
@@ -467,6 +525,102 @@ func _select(index: int, immediate := false) -> void:
             tween.tween_property(card, "modulate:a", 1.0 if selected_card else 0.70 if distance == 1 else 0.42, 0.18)
     buttons[selected].grab_focus()
 
+func _select_tile_grid(index: int, immediate := false) -> void:
+    selected = clampi(index, 0, buttons.size() - 1)
+    var focus_item: Dictionary = buttons[selected].get_meta("item", {})
+    var subtitle := str(focus_item.get("subtitle", ""))
+    var hint := str(focus_item.get("hint", ""))
+    detail.text = subtitle
+    detail.visible = not subtitle.is_empty()
+    selection_label.text = "—  %s  —" % hint if not hint.is_empty() else ""
+    selection_label.visible = not hint.is_empty()
+    arcade_fx.set_accent(Color(str(focus_item.get("color", "f2a93b"))))
+    var selected_row := selected / TILE_GRID_COLUMNS
+    var first_visible_row := maxi(0, selected_row - (TILE_GRID_VISIBLE_ROWS - 1))
+    var first_visible_index := first_visible_row * TILE_GRID_COLUMNS
+    var last_visible_index := mini(buttons.size(), first_visible_index + TILE_GRID_PAGE_SIZE)
+    footer.text = "D-PAD  Browse    SELECT  Open    BACK  Home    %d–%d of %d" % [
+        first_visible_index + 1,
+        last_visible_index,
+        buttons.size(),
+    ]
+    for card in buttons:
+        var card_index := int(card.get_meta("index", 0))
+        var row := card_index / TILE_GRID_COLUMNS
+        var column := card_index % TILE_GRID_COLUMNS
+        var visible_row := row - first_visible_row
+        var visible_card := visible_row >= 0 and visible_row < TILE_GRID_VISIBLE_ROWS
+        var previous_tween: Tween = card_tweens.get(card)
+        if previous_tween != null and previous_tween.is_valid():
+            previous_tween.kill()
+        card.visible = visible_card
+        if not visible_card:
+            continue
+        var selected_card := card_index == selected
+        var target_position := TILE_GRID_ORIGIN + Vector2(column * TILE_GRID_STEP.x, visible_row * TILE_GRID_STEP.y)
+        card.size = TILE_GRID_CARD_SIZE
+        card.pivot_offset = TILE_GRID_CARD_SIZE * 0.5
+        card.rotation = 0.0
+        card.z_index = 10 if selected_card else 1
+        card.clip_contents = true
+        var accent: Color = card.get_meta("accent", AMBER)
+        var tile_style := _box(
+            Color("1c2b42") if selected_card else Color("162235"),
+            AMBER if selected_card else Color(accent, 0.78),
+            4 if selected_card else 2,
+            12
+        )
+        card.add_theme_stylebox_override("normal", tile_style)
+        card.add_theme_stylebox_override("focus", tile_style)
+        card.add_theme_stylebox_override("hover", _box(Color("1c2b42"), AMBER, 4, 12))
+        card.add_theme_stylebox_override("pressed", _box(Color("23344d"), AMBER, 4, 12))
+        var art_node: Control = card.get_meta("art_node", null)
+        if art_node != null:
+            _update_external_card_art(card, 0)
+            art_node.custom_minimum_size.y = 126.0
+            art_node.modulate.a = 1.0 if selected_card else 0.88
+        var caption_node: Label = card.get_meta("caption_node") if card.has_meta("caption_node") else null
+        if caption_node != null:
+            caption_node.visible = true
+            caption_node.add_theme_font_size_override("font_size", 19 if selected_card else 17)
+        var mark_node: Label = card.get_meta("mark_node") if card.has_meta("mark_node") else null
+        if mark_node != null:
+            var long_mark := mark_node.text.length() > 2
+            mark_node.add_theme_font_size_override("font_size", 58 if long_mark else 78)
+            mark_node.add_theme_constant_override("outline_size", 10)
+            mark_node.add_theme_color_override("font_outline_color", Color(AMBER if selected_card else accent, 0.62))
+        var art_material: ShaderMaterial = card.get_meta("art_material") if card.has_meta("art_material") else null
+        if art_material != null:
+            art_material.set_shader_parameter("outline_color", AMBER if selected_card else accent)
+            art_material.set_shader_parameter("outline_strength", 0.92 if selected_card else 0.46)
+            art_material.set_shader_parameter("glow_strength", 0.30 if selected_card else 0.10)
+        if immediate:
+            card.position = target_position
+            card.modulate.a = 1.0 if selected_card else 0.84
+        else:
+            var tween := create_tween().set_parallel(true).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+            card_tweens[card] = tween
+            tween.tween_property(card, "position", target_position, 0.18)
+            tween.tween_property(card, "modulate:a", 1.0 if selected_card else 0.84, 0.14)
+    buttons[selected].grab_focus()
+
+func _move_tile_grid(horizontal: int, vertical: int) -> void:
+    if buttons.is_empty():
+        return
+    var row := selected / TILE_GRID_COLUMNS
+    var column := selected % TILE_GRID_COLUMNS
+    var target := selected
+    if vertical != 0:
+        var target_row := row + vertical
+        var row_start := target_row * TILE_GRID_COLUMNS
+        if target_row >= 0 and row_start < buttons.size():
+            target = mini(row_start + column, buttons.size() - 1)
+    elif horizontal < 0 and column > 0:
+        target -= 1
+    elif horizontal > 0 and column < TILE_GRID_COLUMNS - 1 and target + 1 < buttons.size():
+        target += 1
+    _select(target)
+
 func _carousel_offset(card_index: int, focus_index: int, item_count: int) -> int:
     var offset := card_index - focus_index
     if item_count <= 1:
@@ -519,9 +673,9 @@ func _update_external_card_art(card: Button, distance: int) -> void:
         art_node.texture = null
 
 func _set_visual_mode(in_library: bool, next_items: Array) -> void:
-    var in_streaming := current_menu_path.to_upper().contains("STREAMING")
-    var showcase_mode := in_library or in_streaming
-    if in_streaming:
+    var in_movies_tv := current_menu_path.to_upper().contains("MOVIES & TV")
+    var showcase_mode := in_library or in_movies_tv
+    if in_movies_tv:
         background.texture = load(VIDEO_CLUB_BACKGROUND_PATH)
     elif in_library:
         background.texture = load(ARCADE_BACKGROUND_PATH) if current_menu_path.ends_with("MY LIBRARY") else load(CONSOLE_GALLERY_BACKGROUND_PATH)
@@ -531,8 +685,12 @@ func _set_visual_mode(in_library: bool, next_items: Array) -> void:
     arcade_fx.set_arcade_mode(showcase_mode)
     collection_label.visible = showcase_mode
     selection_label.visible = showcase_mode
-    if in_streaming:
-        collection_label.text = "%d SERVICES READY" % next_items.size()
+    if in_movies_tv:
+        var destination_count := 0
+        for item in next_items:
+            if item is Dictionary and str(item.get("id", "")) != "manage-services":
+                destination_count += 1
+        collection_label.text = "%d DESTINATIONS READY" % destination_count
     elif in_library:
         var total_games := 0
         for item in next_items:
@@ -550,9 +708,16 @@ func _activate(item: Dictionary, card: Button) -> void:
     last_button = card
     var kind := str(item.get("type", ""))
     if kind == "panel":
-        if str(item.get("panel_id", "")) == "input_settings":
+        var panel_id := str(item.get("panel_id", ""))
+        if panel_id == "input_settings":
             input_settings.open_panel()
             footer.text = "Input settings"
+        elif panel_id == "library_settings":
+            library_settings.open_panel(library_settings_store.data, _launcher_system_options())
+            footer.text = "Library & launchers"
+        elif panel_id == "streaming_services":
+            streaming_services.open_panel(_manageable_streaming_services(), streaming_service_store.enabled_ids)
+            footer.text = "Movies & TV services"
         else:
             _show_error("This settings panel is not available yet.")
         return
@@ -566,8 +731,22 @@ func _activate(item: Dictionary, card: Button) -> void:
         return
     if kind == "submenu":
         var children: Array = item.get("children", [])
-        stack.append({"items":items,"title":current_menu_title,"path":current_menu_path,"index":selected})
-        _show_menu(children, str(item.get("label", "Menu")), current_menu_path + "  ›  " + str(item.get("label", "Menu")))
+        if str(item.get("id", "")) == "movies-tv":
+            children = _movies_tv_items()
+        stack.append({
+            "items":items,
+            "title":current_menu_title,
+            "path":current_menu_path,
+            "index":selected,
+            "layout":current_menu_layout,
+        })
+        _show_menu(
+            children,
+            str(item.get("label", "Menu")),
+            current_menu_path + "  ›  " + str(item.get("label", "Menu")),
+            0,
+            str(item.get("menu_layout", "carousel"))
+        )
         return
     if kind == "unavailable":
         _show_error(str(item.get("error", "Install and map a compatible RetroArch core first.")))
@@ -606,11 +785,15 @@ func _on_library_closed() -> void:
         last_button.grab_focus()
 
 func _library_systems() -> Array:
+    system_folder_art.clear()
+    system_folder_wallpapers.clear()
     var buckets: Dictionary = {}
     for system in systems:
         if typeof(system) == TYPE_DICTIONARY:
             buckets[str(system.get("id", ""))] = _manifest_games(system)
     var unknown: Dictionary = {}
+    var unknown_art: Dictionary = {}
+    var unknown_wallpapers: Dictionary = {}
     if DirAccess.dir_exists_absolute(LIBRARY_ROOT):
         var loose_files: Array = []
         _scan_system_folder(LIBRARY_ROOT, {}, loose_files, 0, false)
@@ -627,8 +810,19 @@ func _library_systems() -> Array:
                 _scan_system_folder(LIBRARY_ROOT.path_join(folder), {}, unknown_games)
                 if not unknown_games.is_empty():
                     unknown[folder] = unknown_games
+                    var unknown_folder_path := LIBRARY_ROOT.path_join(folder)
+                    unknown_art[folder] = _find_folder_art(unknown_folder_path)
+                    unknown_wallpapers[folder] = _find_folder_wallpaper(unknown_folder_path)
             else:
-                _scan_system_folder(LIBRARY_ROOT.path_join(folder), mapped, buckets[str(mapped.get("id", ""))])
+                var mapped_folder_path := LIBRARY_ROOT.path_join(folder)
+                var mapped_system_id := str(mapped.get("id", ""))
+                var folder_art := _find_folder_art(mapped_folder_path)
+                if not folder_art.is_empty() and not system_folder_art.has(mapped_system_id):
+                    system_folder_art[mapped_system_id] = folder_art
+                var folder_wallpaper := _find_folder_wallpaper(mapped_folder_path)
+                if not folder_wallpaper.is_empty() and not system_folder_wallpapers.has(mapped_system_id):
+                    system_folder_wallpapers[mapped_system_id] = folder_wallpaper
+                _scan_system_folder(mapped_folder_path, mapped, buckets[mapped_system_id])
     var family_items: Array = []
     for family in families:
         if typeof(family) != TYPE_DICTIONARY:
@@ -641,16 +835,23 @@ func _library_systems() -> Array:
                 if games.is_empty():
                     continue
                 family_systems.append(_system_item(system, games))
-                family_game_count += games.size()
+                family_game_count += _game_count(games)
         if not family_systems.is_empty():
             family_items.append({"id":str(family.get("id", "family")),"label":str(family.get("label", "Systems")),"art":str(family.get("art", "")),"subtitle":"%d systems • %d game%s" % [family_systems.size(), family_game_count, "" if family_game_count == 1 else "s"],"count_label":"%d game%s" % [family_game_count, "" if family_game_count == 1 else "s"],"game_count":family_game_count,"hint":"Choose a family","header_hint":"Choose a family","mark":str(family.get("mark", "•")),"color":str(family.get("color", "426d8d")),"type":"submenu","children":family_systems,"enabled":true})
     if not unknown.is_empty():
         var unknown_systems: Array = []
         var unmapped_game_count := 0
         for folder in unknown:
-            var unknown_game_count: int = unknown[folder].size()
+            var unknown_game_count := _game_count(unknown[folder])
             unmapped_game_count += unknown_game_count
-            unknown_systems.append({"id":"unmapped-" + str(folder),"label":str(folder).replace("_", " ").replace("-", " ").capitalize(),"subtitle":"%d game%s • emulator not assigned" % [unknown_game_count, "" if unknown_game_count == 1 else "s"],"count_label":"%d game%s" % [unknown_game_count, "" if unknown_game_count == 1 else "s"],"hint":"Add this folder to system-registry.json","mark":"?","color":"5e6470","type":"submenu","children":unknown[folder],"enabled":true})
+            var unknown_system := {"id":"unmapped-" + str(folder),"label":str(folder).replace("_", " ").replace("-", " ").capitalize(),"subtitle":"%d game%s • emulator not assigned" % [unknown_game_count, "" if unknown_game_count == 1 else "s"],"count_label":"%d game%s" % [unknown_game_count, "" if unknown_game_count == 1 else "s"],"game_count":unknown_game_count,"hint":"Add this folder to system-registry.json","mark":"?","color":"5e6470","type":"submenu","children":unknown[folder],"enabled":true}
+            var unknown_folder_art := str(unknown_art.get(folder, ""))
+            if not unknown_folder_art.is_empty():
+                unknown_system["art"] = unknown_folder_art
+            var unknown_folder_wallpaper := str(unknown_wallpapers.get(folder, ""))
+            if not unknown_folder_wallpaper.is_empty():
+                unknown_system["wallpaper"] = unknown_folder_wallpaper
+            unknown_systems.append(unknown_system)
         family_items.append({"id":"unmapped","label":"Unmapped Library","subtitle":"%d folders • %d game%s" % [unknown_systems.size(), unmapped_game_count, "" if unmapped_game_count == 1 else "s"],"count_label":"%d game%s" % [unmapped_game_count, "" if unmapped_game_count == 1 else "s"],"game_count":unmapped_game_count,"hint":"Choose a family","header_hint":"Choose a family","mark":"?","color":"5e6470","type":"submenu","children":unknown_systems,"enabled":true})
     return family_items
 
@@ -660,6 +861,15 @@ func _manifest_games(system: Dictionary) -> Array:
     var manifest_games: Array = []
     var entries: Array = system.get("entries", []).duplicate(true)
     var manifest_path := str(system.get("manifest_path", ""))
+    if not manifest_path.is_empty():
+        var manifest_folder := manifest_path.get_base_dir()
+        var system_id := str(system.get("id", ""))
+        var manifest_icon := _find_folder_art(manifest_folder)
+        if not manifest_icon.is_empty():
+            system_folder_art[system_id] = manifest_icon
+        var manifest_wallpaper := _find_folder_wallpaper(manifest_folder)
+        if not manifest_wallpaper.is_empty():
+            system_folder_wallpapers[system_id] = manifest_wallpaper
     if not manifest_path.is_empty() and FileAccess.file_exists(manifest_path):
         var manifest_file := FileAccess.open(manifest_path, FileAccess.READ)
         if manifest_file != null:
@@ -693,7 +903,17 @@ func _manifest_games(system: Dictionary) -> Array:
             "system_label":str(system.get("label", "PC Games")),
             "family_id":str(system.get("family", "pc"))
         }
-        var art_path := str(entry.get("art", ""))
+        var entry_folder := str(entry.get("folder", entry.get("source_folder", "")))
+        if not entry_folder.is_empty() and not entry_folder.is_absolute_path() and not manifest_path.is_empty():
+            entry_folder = manifest_path.get_base_dir().path_join(entry_folder)
+        if not entry_folder.is_empty() and DirAccess.dir_exists_absolute(entry_folder):
+            game["source_folder"] = entry_folder
+            var entry_wallpaper := _find_folder_wallpaper(entry_folder)
+            if not entry_wallpaper.is_empty():
+                game["wallpaper"] = entry_wallpaper
+        var art_path := _find_folder_art(entry_folder) if not entry_folder.is_empty() else ""
+        if art_path.is_empty():
+            art_path = str(entry.get("art", ""))
         if not art_path.is_empty() and FileAccess.file_exists(art_path):
             game["art"] = art_path
             game["art_mode"] = "cover"
@@ -706,13 +926,20 @@ func _manifest_games(system: Dictionary) -> Array:
     return manifest_games
 
 func _system_item(system: Dictionary, games: Array) -> Dictionary:
-    var count := games.size()
-    var art_path := str(system.get("art", ""))
+    var count := _game_count(games)
+    var system_id := str(system.get("id", "system"))
+    var art_path := str(system_folder_art.get(system_id, system.get("art", "")))
     var system_label := str(system.get("label", "System"))
-    return {"id":str(system.get("id", "system")),"label":system_label,"subtitle":"%d game%s available" % [count, "" if count == 1 else "s"],"caption":system_label,"game_count":count,"art":art_path,"art_fit":"contain","hint":"Choose a game","header_hint":"","mark":str(system.get("mark", "•")),"color":str(system.get("color", "426d8d")),"type":"submenu","children":games,"enabled":true}
+    var item := {"id":system_id,"label":system_label,"subtitle":"%d game%s available" % [count, "" if count == 1 else "s"],"caption":system_label,"game_count":count,"art":art_path,"hint":"Choose a game","header_hint":"","mark":str(system.get("mark", "•")),"color":str(system.get("color", "426d8d")),"type":"submenu","children":games,"enabled":true}
+    var wallpaper_path := str(system_folder_wallpapers.get(system_id, ""))
+    if not wallpaper_path.is_empty():
+        item["wallpaper"] = wallpaper_path
+    if not system_folder_art.has(system_id):
+        item["art_fit"] = "contain"
+    return item
 
 func _scan_system_folder(folder_path: String, system: Dictionary, games: Array, depth := 0, scan_children := true) -> void:
-    if depth > 3:
+    if depth > 8:
         return
     var files: PackedStringArray = DirAccess.get_files_at(folder_path)
     files.sort()
@@ -724,7 +951,7 @@ func _scan_system_folder(folder_path: String, system: Dictionary, games: Array, 
         var allowed_extensions: Array = system.get("extensions", [])
         if not system.is_empty() and not allowed_extensions.is_empty() and not extension in allowed_extensions:
             continue
-        var core := str(system.get("core", ""))
+        var core := _core_for_system(system)
         var core_available := not _retroarch_core_path(core).is_empty()
         var supported := not system.is_empty() and core_available
         var game_title := _clean_game_title(filename)
@@ -740,7 +967,11 @@ func _scan_system_folder(folder_path: String, system: Dictionary, games: Array, 
                 game["art_fit"] = "contain"
         if supported:
             game["executable"] = "/opt/hearth/launchers/retroarch-game.sh"
-            game["args"] = [core, full_path]
+            game["args"] = [
+                core,
+                full_path,
+                "fullscreen" if library_settings_store.retroarch_fullscreen() else "windowed",
+            ]
         else:
             game["error"] = "Hearth found %s. %s is configured for %s, but the required core (%s) is not installed yet." % [filename, str(system.get("label", "this folder")), str(system.get("emulator_label", "RetroArch")), core if not core.is_empty() else "none"]
         games.append(game)
@@ -750,7 +981,58 @@ func _scan_system_folder(folder_path: String, system: Dictionary, games: Array, 
     folders.sort()
     for child in folders:
         if not child.begins_with("."):
-            _scan_system_folder(folder_path.path_join(child), system, games, depth + 1)
+            var child_path := folder_path.path_join(child)
+            var child_items: Array = []
+            _scan_system_folder(child_path, system, child_items, depth + 1)
+            if child_items.is_empty():
+                continue
+            if library_settings_store.preserve_folders():
+                games.append(_folder_item(child_path, child, system, child_items))
+            else:
+                games.append_array(child_items)
+
+func _folder_item(folder_path: String, folder_name: String, system: Dictionary, children: Array) -> Dictionary:
+    var count := _game_count(children)
+    var label := folder_name.replace("_", " ").replace("-", " ").capitalize()
+    var item := {
+        "id": "folder-" + folder_path.sha256_text().left(12),
+        "label": label,
+        "caption": label,
+        "subtitle": "%d game%s" % [count, "" if count == 1 else "s"],
+        "count_label": "%d" % count,
+        "game_count": count,
+        "hint": "Open folder",
+        "header_hint": "",
+        "mark": "DIR",
+        "color": str(system.get("color", "5e6470")),
+        "type": "folder",
+        "children": children,
+        "source_folder": folder_path,
+        "enabled": true,
+    }
+    var folder_art := _find_folder_art(folder_path)
+    if not folder_art.is_empty():
+        item["art"] = folder_art
+    else:
+        var fallback_art := str(system.get("art", ""))
+        if not fallback_art.is_empty():
+            item["art"] = fallback_art
+            item["art_fit"] = "contain"
+    var folder_wallpaper := _find_folder_wallpaper(folder_path)
+    if not folder_wallpaper.is_empty():
+        item["wallpaper"] = folder_wallpaper
+    return item
+
+func _game_count(items_value: Array) -> int:
+    var count := 0
+    for item_value in items_value:
+        if not item_value is Dictionary:
+            continue
+        if str(item_value.get("type", "")) == "folder":
+            count += _game_count(item_value.get("children", []))
+        else:
+            count += 1
+    return count
 
 func _clean_game_title(filename: String) -> String:
     var title := filename.get_basename()
@@ -843,6 +1125,48 @@ func _first_image_with_stem(folder_path: String, stem: String) -> String:
         if FileAccess.file_exists(candidate):
             return candidate
     return ""
+
+func _find_folder_art(folder_path: String) -> String:
+    if library_settings_store == null or library_settings_store.folder_art_mode() == "disabled":
+        return ""
+    if not DirAccess.dir_exists_absolute(folder_path):
+        return ""
+    var image_files: Array[String] = []
+    for filename in DirAccess.get_files_at(folder_path):
+        if (
+            filename.get_extension().to_lower() in ["png", "jpg", "jpeg", "webp"]
+            and filename.get_basename().to_lower() != "wallpaper"
+        ):
+            image_files.append(filename)
+    image_files.sort_custom(func(a: String, b: String) -> bool:
+        return a.naturalnocasecmp_to(b) < 0
+    )
+    for preferred_stem in ["icon", "folder", "cover", "poster"]:
+        for filename in image_files:
+            if filename.get_basename().to_lower() == preferred_stem:
+                return folder_path.path_join(filename)
+    if library_settings_store.folder_art_mode() == "named_or_first" and not image_files.is_empty():
+        return folder_path.path_join(image_files[0])
+    return ""
+
+func _find_folder_wallpaper(folder_path: String) -> String:
+    if (
+        library_settings_store == null
+        or not library_settings_store.folder_wallpapers()
+        or not DirAccess.dir_exists_absolute(folder_path)
+    ):
+        return ""
+    var image_files: Array[String] = []
+    for filename in DirAccess.get_files_at(folder_path):
+        if (
+            filename.get_extension().to_lower() in ["png", "jpg", "jpeg", "webp"]
+            and filename.get_basename().to_lower() == "wallpaper"
+        ):
+            image_files.append(filename)
+    image_files.sort_custom(func(a: String, b: String) -> bool:
+        return a.naturalnocasecmp_to(b) < 0
+    )
+    return folder_path.path_join(image_files[0]) if not image_files.is_empty() else ""
 
 func _artwork_lookup_title(filename: String) -> String:
     var title := _clean_game_title(filename)
@@ -1000,6 +1324,14 @@ func _unhandled_input(event: InputEvent) -> void:
         input_settings.handle_unhandled_input(event)
         get_viewport().set_input_as_handled()
         return
+    if library_settings.visible:
+        library_settings.handle_unhandled_input(event, input_manager)
+        get_viewport().set_input_as_handled()
+        return
+    if streaming_services.visible:
+        streaming_services.handle_unhandled_input(event, input_manager)
+        get_viewport().set_input_as_handled()
+        return
     if input_manager.action_pressed(event, "home") and not stack.is_empty():
         stack.clear()
         _load_home()
@@ -1009,7 +1341,29 @@ func _unhandled_input(event: InputEvent) -> void:
             modal.visible = false
         elif not stack.is_empty():
             var previous: Dictionary = stack.pop_back()
-            _show_menu(previous["items"], previous["title"], previous["path"], int(previous["index"]))
+            _show_menu(
+                previous["items"],
+                previous["title"],
+                previous["path"],
+                int(previous["index"]),
+                str(previous.get("layout", "carousel"))
+            )
+        return
+    if current_menu_layout == "tile_grid":
+        if input_manager.action_pressed(event, "navigate_up"):
+            _move_tile_grid(0, -1)
+        elif input_manager.action_pressed(event, "navigate_down"):
+            _move_tile_grid(0, 1)
+        elif input_manager.action_pressed(event, "navigate_left"):
+            _move_tile_grid(-1, 0)
+        elif input_manager.action_pressed(event, "navigate_right"):
+            _move_tile_grid(1, 0)
+        elif input_manager.action_pressed(event, "page_left"):
+            _select(selected - TILE_GRID_PAGE_SIZE)
+        elif input_manager.action_pressed(event, "page_right"):
+            _select(selected + TILE_GRID_PAGE_SIZE)
+        elif input_manager.action_pressed(event, "select") and selected >= 0 and selected < buttons.size():
+            _activate(buttons[selected].get_meta("item", {}), buttons[selected])
         return
     var left: bool = input_manager.action_pressed(event, "navigate_left") or input_manager.action_pressed(event, "page_left")
     var right: bool = input_manager.action_pressed(event, "navigate_right") or input_manager.action_pressed(event, "page_right")
@@ -1031,6 +1385,100 @@ func _on_input_settings_closed() -> void:
     footer.text = "Returned to Hearth"
     if is_instance_valid(last_button):
         last_button.grab_focus()
+
+func _on_streaming_services_save_requested(enabled_ids: Array[String]) -> void:
+    if streaming_service_store.save(enabled_ids):
+        call_deferred("_refresh_movies_tv_menu")
+    else:
+        _show_error(streaming_service_store.last_error)
+
+func _refresh_movies_tv_menu() -> void:
+    if not current_menu_path.to_upper().contains("MOVIES & TV"):
+        return
+    var next_items := _movies_tv_items()
+    var manage_index := maxi(0, next_items.size() - 1)
+    _show_menu(next_items, "Movies & TV", current_menu_path, manage_index, "tile_grid")
+
+func _on_streaming_services_closed() -> void:
+    footer.text = "Returned to Movies & TV"
+    if is_instance_valid(last_button):
+        last_button.grab_focus()
+
+func _on_library_settings_save_requested(settings: Dictionary) -> void:
+    if library_settings_store.save_settings(settings):
+        artwork_indexes.clear()
+        system_folder_art.clear()
+        system_folder_wallpapers.clear()
+        footer.text = "Library settings saved"
+    else:
+        _show_error(library_settings_store.last_error)
+
+func _on_library_settings_closed() -> void:
+    if footer.text != "Library settings saved":
+        footer.text = "Returned to Hearth"
+    if is_instance_valid(last_button):
+        last_button.grab_focus()
+
+func _launcher_system_options() -> Array:
+    var result: Array = []
+    for system_value in systems:
+        if not system_value is Dictionary:
+            continue
+        var system: Dictionary = system_value
+        if str(system.get("backend", "")) == "manifest" or str(system.get("core", "")).is_empty():
+            continue
+        var options: Array = []
+        for option_value in _core_options_for_system(system):
+            var core_file := str(option_value.get("core", ""))
+            options.append({
+                "core": core_file,
+                "label": str(option_value.get("label", core_file.trim_suffix("_libretro.so"))),
+                "installed": not _retroarch_core_path(core_file).is_empty(),
+            })
+        result.append({
+            "id": str(system.get("id", "")),
+            "label": str(system.get("label", "System")),
+            "default_core": str(system.get("core", "")),
+            "default_label": str(system.get("emulator_label", system.get("core", ""))),
+            "options": options,
+        })
+    return result
+
+func _core_options_for_system(system: Dictionary) -> Array:
+    var result: Array = []
+    var seen: Dictionary = {}
+    var configured_options: Array = system.get("core_options", [])
+    for option_value in configured_options:
+        var option: Dictionary
+        if option_value is Dictionary:
+            option = option_value
+        else:
+            option = {"core":str(option_value), "label":str(option_value).trim_suffix("_libretro.so")}
+        var core_file := str(option.get("core", ""))
+        if core_file.is_empty() or seen.has(core_file):
+            continue
+        seen[core_file] = true
+        result.append(option)
+    var default_core := str(system.get("core", ""))
+    if not default_core.is_empty() and not seen.has(default_core):
+        result.push_front({
+            "core": default_core,
+            "label": str(system.get("emulator_label", default_core)).trim_prefix("RetroArch • "),
+        })
+    return result
+
+func _core_for_system(system: Dictionary) -> String:
+    var configured_core: String = library_settings_store.core_for(system)
+    for option in _core_options_for_system(system):
+        if str(option.get("core", "")) == configured_core:
+            return configured_core
+    return str(system.get("core", ""))
+
+func _item_with_id(source_items: Array, item_id: String) -> Dictionary:
+    for item in source_items:
+        if item is Dictionary and str(item.get("id", "")) == item_id:
+            return item
+    return {}
 
 func _process(delta: float) -> void:
     card_phase += delta

@@ -1,7 +1,7 @@
 extends Control
 
-## A lightweight, paged library browser. The launcher owns catalog discovery and
-## launching; this overlay only presents the supplied dictionaries.
+## A lightweight, scrollable library browser. The launcher owns catalog discovery
+## and launching; this overlay only presents the supplied dictionaries.
 
 signal launch_requested(item: Dictionary)
 signal closed
@@ -11,8 +11,11 @@ const PAPER := Color("f3f5f7")
 const MUTED := Color("aeb9c8")
 const AMBER := Color("f2a93b")
 const DRAWER_WIDTH := 320.0
-const PAGE_SIZE := 24
 const GRID_COLUMNS := 6
+const GRID_ROW_HEIGHT := 208.0
+const GRID_CARD_SIZE := Vector2(222, 190)
+const GRID_VIEWPORT_HEIGHT := 840.0
+const PAGE_JUMP_ROWS := 4
 const HOME_COLUMNS := 6
 const HOME_CARD_LIMIT := 6
 const BACKGROUND := preload("res://assets/backgrounds/arcade-attract-v1.png")
@@ -22,6 +25,8 @@ var _activity_store: Variant = {}
 var _all_games: Array = []
 var _current_family: Dictionary = {}
 var _current_system: Dictionary = {}
+var _current_collection: Dictionary = {}
+var _folder_stack: Array[Dictionary] = []
 var _drawer_level := 0
 var _drawer_items: Array = []
 var _drawer_index := 0
@@ -35,13 +40,16 @@ var _built := false
 var _texture_cache: Dictionary = {}
 var _texture_order: Array[String] = []
 var _card_coordinates: Array[Vector2i] = []
+var _wallpaper_path := ""
 
+var _background: TextureRect
 var _drawer: PanelContainer
 var _drawer_title: Label
 var _drawer_list: VBoxContainer
 var _content: Control
 var _heading: Label
 var _subheading: Label
+var _card_scroll: ScrollContainer
 var _cards: Control
 var _page_label: Label
 var _drawer_buttons: Array[Button] = []
@@ -80,7 +88,11 @@ func handle_input(action_id: StringName) -> bool:
         return false
     match String(action_id):
         "ui_cancel":
-            if not _current_system.is_empty():
+            if not _folder_stack.is_empty():
+                _current_collection = _folder_stack.pop_back()
+                _content_index = 0
+                _render_system_grid()
+            elif not _current_system.is_empty():
                 _drawer_level = 0
                 _drawer_index = 0
                 _show_home()
@@ -123,17 +135,20 @@ func debug_state() -> Dictionary:
         "content_index": _content_index,
         "selected_row": _selected_card_coordinate().x,
         "selected_column": _selected_card_coordinate().y,
-        "system_id": str(_current_system.get("id", ""))
+        "system_id": str(_current_system.get("id", "")),
+        "folder_depth": _folder_stack.size(),
+        "collection_id": str(_current_collection.get("id", "")),
+        "wallpaper_path": _wallpaper_path
     }
 
 func _build_ui() -> void:
-    var background := TextureRect.new()
-    background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    background.texture = BACKGROUND
-    background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-    background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-    background.mouse_filter = Control.MOUSE_FILTER_IGNORE
-    add_child(background)
+    _background = TextureRect.new()
+    _background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    _background.texture = BACKGROUND
+    _background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+    _background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+    _background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    add_child(_background)
 
     var veil := ColorRect.new()
     veil.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -181,10 +196,16 @@ func _build_ui() -> void:
     _subheading.position = Vector2(61, 105)
     _subheading.size = Vector2(1160, 30)
     _content.add_child(_subheading)
+    _card_scroll = ScrollContainer.new()
+    _card_scroll.position = Vector2(50, 150)
+    _card_scroll.size = Vector2(1500, GRID_VIEWPORT_HEIGHT)
+    _card_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    _card_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+    _content.add_child(_card_scroll)
     _cards = Control.new()
-    _cards.position = Vector2(50, 150)
-    _cards.size = Vector2(1500, 850)
-    _content.add_child(_cards)
+    _cards.custom_minimum_size = Vector2(1450, GRID_VIEWPORT_HEIGHT)
+    _card_scroll.add_child(_cards)
+    _card_scroll.get_v_scroll_bar().value_changed.connect(_on_card_scroll_changed)
     _page_label = _label("", 17, MUTED)
     _page_label.position = Vector2(1030, 1010)
     _page_label.size = Vector2(500, 28)
@@ -193,6 +214,8 @@ func _build_ui() -> void:
 
 func _show_home() -> void:
     _current_system = {}
+    _current_collection = {}
+    _folder_stack.clear()
     _page = 0
     _content_index = 0
     debug_view = "home"
@@ -200,6 +223,7 @@ func _show_home() -> void:
     _subheading.text = "%d games • choose a family, system, or pick up where you left off" % debug_total_games
     _page_label.text = "SELECT  Open    BACK  Close"
     _build_drawer()
+    _card_scroll.scroll_vertical = 0
     _home_rows = _make_home_rows()
     _visible_items.clear()
     _clear_cards()
@@ -229,37 +253,40 @@ func _show_home() -> void:
 
 func _show_system(system: Dictionary) -> void:
     _current_system = system
+    _current_collection = system
+    _folder_stack.clear()
     _page = 0
     _content_index = 0
     _focus_area = 1
     debug_view = "system"
-    _heading.text = str(system.get("label", "Games"))
-    var games: Array = system.get("children", [])
-    _subheading.text = "%d game%s available" % [games.size(), "" if games.size() == 1 else "s"]
-    _render_system_page()
+    _render_system_grid()
 
-func _render_system_page() -> void:
-    var games: Array = _current_system.get("children", [])
-    debug_page_count = maxi(1, int(ceil(float(games.size()) / float(PAGE_SIZE))))
-    _page = clampi(_page, 0, debug_page_count - 1)
-    var first := _page * PAGE_SIZE
-    var last := mini(first + PAGE_SIZE, games.size())
-    _visible_items = games.slice(first, last)
+func _render_system_grid() -> void:
+    var games: Array = _current_collection.get("children", [])
+    var game_count := _count_games(games)
+    _heading.text = str(_current_collection.get("label", _current_system.get("label", "Games")))
+    _subheading.text = "%d game%s available" % [game_count, "" if game_count == 1 else "s"]
+    debug_page_count = 1
+    _page = 0
+    _visible_items = games.duplicate()
     _content_index = clampi(_content_index, 0, maxi(0, _visible_items.size() - 1))
     _clear_cards()
+    _card_scroll.scroll_vertical = 0
+    var row_count := int(ceil(float(_visible_items.size()) / float(GRID_COLUMNS)))
+    _cards.custom_minimum_size.y = maxf(GRID_VIEWPORT_HEIGHT, row_count * GRID_ROW_HEIGHT)
     for index in range(_visible_items.size()):
         var column := index % GRID_COLUMNS
         var row := index / GRID_COLUMNS
         _card_coordinates.append(Vector2i(row, column))
         var card := _make_card(
             _visible_items[index],
-            Vector2(column * 240.0, row * 208.0),
-            Vector2(222, 190),
+            Vector2(column * 240.0, row * GRID_ROW_HEIGHT),
+            GRID_CARD_SIZE,
             index
         )
         _cards.add_child(card)
     debug_instantiated_cards = _card_buttons.size()
-    _page_label.text = "Page %d of %d    •    SELECT  Play    BACK  Home" % [_page + 1, debug_page_count]
+    _update_system_footer()
     _refresh_focus()
 
 func _make_home_rows() -> Array:
@@ -385,17 +412,22 @@ func _make_card(item: Dictionary, card_position: Vector2, card_size: Vector2, in
     art.size = Vector2(card_size.x - 16, card_size.y - 52)
     art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
     art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED if str(item.get("art_fit", "")) == "contain" else TextureRect.STRETCH_KEEP_ASPECT_COVERED
-    art.texture = _load_texture(str(item.get("art", "")))
+    var art_path := str(item.get("art", ""))
+    art.texture = _load_texture(art_path) if art_path.begins_with("res://") else null
     art.mouse_filter = Control.MOUSE_FILTER_IGNORE
     button.add_child(art)
-    if art.texture == null:
-        var mark := _label(str(item.get("mark", "•")), 34, AMBER)
-        mark.position = art.position
-        mark.size = art.size
-        mark.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        mark.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-        mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        button.add_child(mark)
+    button.set_meta("art_node", art)
+    if not art_path.is_empty() and not art_path.begins_with("res://"):
+        button.set_meta("external_art_path", art_path)
+    var mark := _label(str(item.get("mark", "•")), 34, AMBER)
+    mark.position = art.position
+    mark.size = art.size
+    mark.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    mark.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+    mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    mark.visible = art.texture == null
+    button.add_child(mark)
+    button.set_meta("mark_node", mark)
     var caption := _label(str(item.get("label", "Game")), 15, PAPER)
     caption.position = Vector2(9, card_size.y - 40)
     caption.size = Vector2(card_size.x - 18, 34)
@@ -440,6 +472,7 @@ func _clear_cards() -> void:
         child.queue_free()
     _card_buttons.clear()
     _card_coordinates.clear()
+    _cards.custom_minimum_size.y = GRID_VIEWPORT_HEIGHT
 
 func _move_vertical(direction: int) -> void:
     if _focus_area == 0:
@@ -464,17 +497,7 @@ func _move_horizontal(direction: int) -> void:
         var columns := HOME_COLUMNS if debug_view == "home" else GRID_COLUMNS
         var column := _selected_card_coordinate().y if debug_view == "home" else _content_index % columns
         if direction < 0 and column == 0:
-            if debug_view == "system" and _page > 0:
-                _page -= 1
-                _content_index = PAGE_SIZE - 1
-                _render_system_page()
-                return
             _focus_area = 0
-        elif direction > 0 and _content_index == _visible_items.size() - 1 and debug_view == "system" and _page + 1 < debug_page_count:
-            _page += 1
-            _content_index = 0
-            _render_system_page()
-            return
         elif debug_view == "home":
             var target_index := _home_index_at(_selected_card_coordinate().x, column + direction)
             if target_index >= 0:
@@ -488,11 +511,13 @@ func _move_horizontal(direction: int) -> void:
 func _change_page(direction: int) -> void:
     if debug_view != "system" or direction == 0:
         return
-    var next_page := clampi(_page + direction, 0, debug_page_count - 1)
-    if next_page == _page:
-        return
-    _page = next_page
-    _render_system_page()
+    _content_index = clampi(
+        _content_index + direction * GRID_COLUMNS * PAGE_JUMP_ROWS,
+        0,
+        maxi(0, _visible_items.size() - 1)
+    )
+    _focus_area = 1
+    _refresh_focus()
 
 func _selected_card_coordinate() -> Vector2i:
     if _content_index < 0 or _content_index >= _card_coordinates.size():
@@ -528,7 +553,14 @@ func _family_drawer_index(family: Dictionary) -> int:
 func _accept_selection() -> void:
     if _focus_area == 1:
         if not _visible_items.is_empty():
-            launch_requested.emit(_visible_items[clampi(_content_index, 0, _visible_items.size() - 1)])
+            var selected_item: Dictionary = _visible_items[clampi(_content_index, 0, _visible_items.size() - 1)]
+            if str(selected_item.get("type", "")) == "folder":
+                _folder_stack.append(_current_collection)
+                _current_collection = selected_item
+                _content_index = 0
+                _render_system_grid()
+            else:
+                launch_requested.emit(selected_item)
         return
     if _drawer_items.is_empty():
         return
@@ -564,6 +596,12 @@ func _refresh_focus() -> void:
             "normal",
             _box(Color("1c2b42"), AMBER if selected else Color("31445f"), 4 if selected else 2, 10)
         )
+    if debug_view == "system":
+        _update_system_footer()
+        _ensure_selected_card_visible()
+    if debug_view == "home" or debug_view == "system":
+        _update_visible_card_art()
+    _update_wallpaper()
 
 func _on_drawer_hover(index: int) -> void:
     _focus_area = 0
@@ -583,6 +621,102 @@ func _on_card_pressed(index: int) -> void:
     _on_card_hover(index)
     _accept_selection()
 
+func _update_system_footer() -> void:
+    var total := _visible_items.size()
+    var selected_number := clampi(_content_index + 1, 0, total)
+    var selected_type := ""
+    if total > 0:
+        selected_type = str(_visible_items[clampi(_content_index, 0, total - 1)].get("type", ""))
+    var noun := "Folder" if selected_type == "folder" else "Game"
+    var action := "Open" if selected_type == "folder" else "Play"
+    var back_target := "Up" if not _folder_stack.is_empty() else "Home"
+    _page_label.text = "%s %d of %d    •    ↑↓  Scroll    SELECT  %s    BACK  %s" % [noun, selected_number, total, action, back_target]
+
+func _ensure_selected_card_visible() -> void:
+    if _focus_area != 1 or _content_index < 0 or _content_index >= _card_buttons.size():
+        return
+    var card := _card_buttons[_content_index]
+    var viewport_top := float(_card_scroll.scroll_vertical)
+    var viewport_bottom := viewport_top + _card_scroll.size.y
+    var card_top := card.position.y
+    var card_bottom := card.position.y + card.size.y
+    if card_top < viewport_top:
+        _card_scroll.scroll_vertical = int(floor(card_top))
+    elif card_bottom > viewport_bottom:
+        _card_scroll.scroll_vertical = int(ceil(card_bottom - _card_scroll.size.y))
+
+func _on_card_scroll_changed(_value: float) -> void:
+    if debug_view == "home" or debug_view == "system":
+        _update_visible_card_art()
+
+func _update_visible_card_art() -> void:
+    if debug_view != "home" and debug_view != "system":
+        return
+    var preload_margin := GRID_ROW_HEIGHT
+    var visible_top := float(_card_scroll.scroll_vertical) - preload_margin
+    var visible_bottom := float(_card_scroll.scroll_vertical) + _card_scroll.size.y + preload_margin
+    for card in _card_buttons:
+        if not card.has_meta("external_art_path"):
+            continue
+        var art: TextureRect = card.get_meta("art_node")
+        var mark: Label = card.get_meta("mark_node")
+        var should_load := card.position.y + card.size.y >= visible_top and card.position.y <= visible_bottom
+        if should_load and art.texture == null:
+            art.texture = _load_texture(str(card.get_meta("external_art_path")))
+        elif not should_load and art.texture != null:
+            art.texture = null
+        mark.visible = art.texture == null
+
+func _update_wallpaper() -> void:
+    var next_path := _selected_wallpaper()
+    if next_path == _wallpaper_path:
+        return
+    _wallpaper_path = next_path
+    if next_path.is_empty():
+        _background.texture = BACKGROUND
+        return
+    if next_path.begins_with("res://"):
+        var packaged_texture := load(next_path) as Texture2D
+        _background.texture = packaged_texture if packaged_texture != null else BACKGROUND
+        return
+    if not FileAccess.file_exists(next_path):
+        _background.texture = BACKGROUND
+        return
+    var image := Image.load_from_file(next_path)
+    if image.is_empty():
+        _background.texture = BACKGROUND
+        return
+    var scale := minf(1.0, minf(1920.0 / float(image.get_width()), 1080.0 / float(image.get_height())))
+    if scale < 1.0:
+        image.resize(
+            maxi(1, int(round(image.get_width() * scale))),
+            maxi(1, int(round(image.get_height() * scale))),
+            Image.INTERPOLATE_LANCZOS
+        )
+    _background.texture = ImageTexture.create_from_image(image)
+
+func _selected_wallpaper() -> String:
+    if _focus_area == 1 and not _visible_items.is_empty():
+        var selected_item: Dictionary = _visible_items[clampi(_content_index, 0, _visible_items.size() - 1)]
+        var selected_path := str(selected_item.get("wallpaper", ""))
+        if not selected_path.is_empty():
+            return selected_path
+    elif _focus_area == 0 and not _drawer_items.is_empty():
+        var drawer_item: Dictionary = _drawer_items[clampi(_drawer_index, 0, _drawer_items.size() - 1)]
+        var drawer_value = drawer_item.get("item", {})
+        if drawer_value is Dictionary:
+            var drawer_path := str(drawer_value.get("wallpaper", ""))
+            if not drawer_path.is_empty():
+                return drawer_path
+    var collection_path := str(_current_collection.get("wallpaper", ""))
+    if not collection_path.is_empty():
+        return collection_path
+    for index in range(_folder_stack.size() - 1, -1, -1):
+        var inherited_path := str(_folder_stack[index].get("wallpaper", ""))
+        if not inherited_path.is_empty():
+            return inherited_path
+    return str(_current_system.get("wallpaper", ""))
+
 func _close() -> void:
     _is_open = false
     visible = false
@@ -597,10 +731,22 @@ func _flatten_games(family_values: Array) -> Array:
         for system_value in family_value.get("children", []):
             if typeof(system_value) != TYPE_DICTIONARY:
                 continue
-            for game_value in system_value.get("children", []):
-                if typeof(game_value) == TYPE_DICTIONARY:
-                    result.append(game_value)
+            _append_games_recursive(system_value.get("children", []), result)
     return result
+
+func _append_games_recursive(items: Array, result: Array) -> void:
+    for item_value in items:
+        if typeof(item_value) != TYPE_DICTIONARY:
+            continue
+        if str(item_value.get("type", "")) == "folder":
+            _append_games_recursive(item_value.get("children", []), result)
+        else:
+            result.append(item_value)
+
+func _count_games(items: Array) -> int:
+    var result: Array = []
+    _append_games_recursive(items, result)
+    return result.size()
 
 func _item_key(item: Dictionary) -> String:
     var rom_path := str(item.get("rom_path", ""))

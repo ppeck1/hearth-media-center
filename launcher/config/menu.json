@@ -2,26 +2,288 @@
   "schema_version": 2,
   "title": "Home",
   "items": [
-    {"id":"games","label":"Games","subtitle":"Browse your personal ROM library","hint":"Enter the Arcade Vault","mark":"PLAY","color":"426d8d","art":"res://assets/nav/games-panel-v1.svg","type":"library","enabled":true},
-    {"id":"plex","label":"Plex","subtitle":"Your media","hint":"Open your local library","mark":"▶","color":"66518a","art":"res://assets/logos/plex.svg","type":"command","executable":"/opt/hearth/launchers/plex-htpc.sh","args":[],"enabled":true},
-    {"id":"steam","label":"Steam","subtitle":"Big Picture","hint":"Open your PC games","mark":"◉","color":"386d7f","art":"res://assets/logos/steam.svg","type":"command","executable":"/opt/hearth/launchers/steam-big-picture.sh","args":[],"enabled":true},
-    {"id":"streaming","label":"Streaming","subtitle":"Your services","hint":"Choose a service","mark":"TV","color":"77603a","art":"res://assets/nav/streaming-panel-v1.svg","type":"submenu","enabled":true,"children":[
-      {"id":"netflix","label":"Netflix","subtitle":"Sign-in required","mark":"N","color":"6b3140","art":"res://assets/logos/netflix-panel-v1.svg","type":"command","executable":"/opt/hearth/launchers/netflix.sh","args":[],"enabled":true},
-      {"id":"prime","label":"Prime Video","subtitle":"Sign-in required","mark":"P","color":"2f6d86","art":"res://assets/logos/primevideo-panel-v1.svg","type":"command","executable":"/opt/hearth/launchers/prime-video.sh","args":[],"enabled":true},
-      {"id":"apple-tv","label":"Apple TV+","subtitle":"Sign-in required","mark":"TV","color":"5d6774","art":"res://assets/logos/appletv-panel-v1.svg","type":"command","executable":"/opt/hearth/launchers/apple-tv.sh","args":[],"enabled":true},
-      {"id":"disney-plus","label":"Disney+","subtitle":"Sign-in required","mark":"D+","color":"31538d","art":"res://assets/logos/disneyplus-panel-v1.svg","type":"command","executable":"/opt/hearth/launchers/disney-plus.sh","args":[],"enabled":true},
-      {"id":"hulu","label":"Hulu","subtitle":"Sign-in required","mark":"H","color":"3f8d63","art":"res://assets/logos/hulu-panel-v1.svg","type":"command","executable":"/opt/hearth/launchers/hulu.sh","args":[],"enabled":true},
-      {"id":"max","label":"HBO Max","subtitle":"Sign-in required","mark":"HBO","color":"504b9a","art":"res://assets/logos/max-panel-v1.svg","type":"command","executable":"/opt/hearth/launchers/max.sh","args":[],"enabled":true},
-      {"id":"paramount-plus","label":"Paramount+","subtitle":"Sign-in required","mark":"P+","color":"37609c","art":"res://assets/logos/paramountplus-panel-v1.svg","type":"command","executable":"/opt/hearth/launchers/paramount-plus.sh","args":[],"enabled":true},
-      {"id":"peacock","label":"Peacock","subtitle":"Sign-in required","mark":"P","color":"8e5576","art":"res://assets/logos/peacock-panel-v1.svg","type":"command","executable":"/opt/hearth/launchers/peacock.sh","args":[],"enabled":true}
-    ]},
-    {"id":"settings","label":"Settings","caption":"Settings","subtitle":"Controllers, remotes, and desktop","hint":"Open settings","mark":"⚙","color":"62758f","type":"submenu","enabled":true,"children":[
-      {"id":"controllers-remotes","label":"Controllers and Remotes","caption":"Controllers and Remotes","subtitle":"Input profiles","hint":"Configure controllers and remotes","mark":"PAD","color":"62758f","type":"panel","panel_id":"input_settings","enabled":true},
-      {"id":"desktop-settings","label":"Desktop Settings","caption":"Desktop Settings","subtitle":"Wi-Fi, Bluetooth, displays, sound, and power","hint":"Open desktop settings","mark":"⚙","color":"5e6470","type":"command","executable":"/opt/hearth/launchers/desktop-settings.sh","args":[],"detached":true,"enabled":true}
-    ]},
-    {"id":"system","label":"System","subtitle":"Power controls","hint":"Restart or shut down safely","mark":"I/O","color":"6d4c4c","art":"res://assets/nav/system-panel-v1.svg","type":"submenu","enabled":true,"children":[
-      {"id":"restart","label":"Restart","subtitle":"Restart this PC","mark":"RE","color":"6d4c4c","type":"command","executable":"/opt/hearth/launchers/restart.sh","args":[],"enabled":true},
-      {"id":"shutdown","label":"Shut Down","subtitle":"Power off this PC","mark":"OFF","color":"6d4c4c","type":"command","executable":"/opt/hearth/launchers/shutdown.sh","args":[],"enabled":true}
-    ]}
+    {
+      "id": "games",
+      "label": "Games",
+      "caption": "Games",
+      "subtitle": "Library and PC games",
+      "hint": "Choose how to play",
+      "mark": "PLAY",
+      "color": "426d8d",
+      "art": "res://assets/nav/games-panel-v1.svg",
+      "type": "submenu",
+      "enabled": true,
+      "children": [
+        {
+          "id": "my-library",
+          "label": "My Library",
+          "caption": "My Library",
+          "subtitle": "Browse your personal game library",
+          "hint": "Open your game collection",
+          "mark": "LIB",
+          "color": "426d8d",
+          "art": "res://assets/nav/games-panel-v1.svg",
+          "type": "library",
+          "enabled": true
+        },
+        {
+          "id": "steam",
+          "label": "Steam Big Picture",
+          "caption": "Steam Big Picture",
+          "subtitle": "PC games",
+          "hint": "Open Steam",
+          "mark": "◉",
+          "color": "386d7f",
+          "art": "res://assets/logos/steam.svg",
+          "type": "command",
+          "executable": "/opt/hearth/launchers/steam-big-picture.sh",
+          "args": [],
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "movies-tv",
+      "label": "Movies & TV",
+      "caption": "Movies & TV",
+      "subtitle": "Plex and streaming services",
+      "hint": "Choose what to watch",
+      "mark": "TV",
+      "color": "77603a",
+      "art": "res://assets/nav/streaming-panel-v1.svg",
+      "type": "submenu",
+      "menu_layout": "tile_grid",
+      "enabled": true,
+      "children": [
+        {
+          "id": "plex",
+          "label": "Plex",
+          "caption": "Plex",
+          "subtitle": "Your local media library",
+          "hint": "Open Plex",
+          "mark": "▶",
+          "color": "66518a",
+          "art": "res://assets/logos/plex.svg",
+          "type": "command",
+          "executable": "/opt/hearth/launchers/plex-htpc.sh",
+          "args": [],
+          "enabled": true
+        },
+        {
+          "id": "netflix",
+          "label": "Netflix",
+          "caption": "Netflix",
+          "subtitle": "Sign-in required",
+          "mark": "N",
+          "color": "6b3140",
+          "art": "res://assets/logos/netflix-panel-v1.svg",
+          "type": "command",
+          "executable": "/opt/hearth/launchers/netflix.sh",
+          "args": [],
+          "manageable_service": true,
+          "enabled": true
+        },
+        {
+          "id": "prime",
+          "label": "Prime Video",
+          "caption": "Prime Video",
+          "subtitle": "Sign-in required",
+          "mark": "P",
+          "color": "2f6d86",
+          "art": "res://assets/logos/primevideo-panel-v1.svg",
+          "type": "command",
+          "executable": "/opt/hearth/launchers/prime-video.sh",
+          "args": [],
+          "manageable_service": true,
+          "enabled": true
+        },
+        {
+          "id": "apple-tv",
+          "label": "Apple TV+",
+          "caption": "Apple TV+",
+          "subtitle": "Sign-in required",
+          "mark": "TV",
+          "color": "5d6774",
+          "art": "res://assets/logos/appletv-panel-v1.svg",
+          "type": "command",
+          "executable": "/opt/hearth/launchers/apple-tv.sh",
+          "args": [],
+          "manageable_service": true,
+          "enabled": true
+        },
+        {
+          "id": "disney-plus",
+          "label": "Disney+",
+          "caption": "Disney+",
+          "subtitle": "Sign-in required",
+          "mark": "D+",
+          "color": "31538d",
+          "art": "res://assets/logos/disneyplus-panel-v1.svg",
+          "type": "command",
+          "executable": "/opt/hearth/launchers/disney-plus.sh",
+          "args": [],
+          "manageable_service": true,
+          "enabled": true
+        },
+        {
+          "id": "hulu",
+          "label": "Hulu",
+          "caption": "Hulu",
+          "subtitle": "Sign-in required",
+          "mark": "H",
+          "color": "3f8d63",
+          "art": "res://assets/logos/hulu-panel-v1.svg",
+          "type": "command",
+          "executable": "/opt/hearth/launchers/hulu.sh",
+          "args": [],
+          "manageable_service": true,
+          "enabled": true
+        },
+        {
+          "id": "max",
+          "label": "HBO Max",
+          "caption": "HBO Max",
+          "subtitle": "Sign-in required",
+          "mark": "HBO",
+          "color": "504b9a",
+          "art": "res://assets/logos/max-panel-v1.svg",
+          "type": "command",
+          "executable": "/opt/hearth/launchers/max.sh",
+          "args": [],
+          "manageable_service": true,
+          "enabled": true
+        },
+        {
+          "id": "paramount-plus",
+          "label": "Paramount+",
+          "caption": "Paramount+",
+          "subtitle": "Sign-in required",
+          "mark": "P+",
+          "color": "37609c",
+          "art": "res://assets/logos/paramountplus-panel-v1.svg",
+          "type": "command",
+          "executable": "/opt/hearth/launchers/paramount-plus.sh",
+          "args": [],
+          "manageable_service": true,
+          "enabled": true
+        },
+        {
+          "id": "peacock",
+          "label": "Peacock",
+          "caption": "Peacock",
+          "subtitle": "Sign-in required",
+          "mark": "P",
+          "color": "8e5576",
+          "art": "res://assets/logos/peacock-panel-v1.svg",
+          "type": "command",
+          "executable": "/opt/hearth/launchers/peacock.sh",
+          "args": [],
+          "manageable_service": true,
+          "enabled": true
+        },
+        {
+          "id": "manage-services",
+          "label": "Add / Remove Services",
+          "caption": "Manage Services",
+          "subtitle": "Choose which services appear",
+          "hint": "Customize Movies & TV",
+          "mark": "+/−",
+          "color": "62758f",
+          "type": "panel",
+          "panel_id": "streaming_services",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "settings",
+      "label": "Settings",
+      "caption": "Settings",
+      "subtitle": "Controllers, remotes, and desktop",
+      "hint": "Open settings",
+      "mark": "⚙",
+      "color": "62758f",
+      "art": "res://assets/nav/maintenance-panel-v1.svg",
+      "type": "submenu",
+      "enabled": true,
+      "children": [
+        {
+          "id": "library-launchers",
+          "label": "Library & Launchers",
+          "caption": "Library & Launchers",
+          "subtitle": "Folder artwork, browsing, and game launchers",
+          "hint": "Customize your game library",
+          "mark": "LIB",
+          "color": "426d8d",
+          "type": "panel",
+          "panel_id": "library_settings",
+          "enabled": true
+        },
+        {
+          "id": "controllers-remotes",
+          "label": "Controllers and Remotes",
+          "caption": "Controllers and Remotes",
+          "subtitle": "Input profiles",
+          "hint": "Configure controllers and remotes",
+          "mark": "PAD",
+          "color": "62758f",
+          "type": "panel",
+          "panel_id": "input_settings",
+          "enabled": true
+        },
+        {
+          "id": "desktop-settings",
+          "label": "Desktop Settings",
+          "caption": "Desktop Settings",
+          "subtitle": "Wi-Fi, Bluetooth, displays, sound, and power",
+          "hint": "Open desktop settings",
+          "mark": "⚙",
+          "color": "5e6470",
+          "type": "command",
+          "executable": "/opt/hearth/launchers/desktop-settings.sh",
+          "args": [],
+          "detached": true,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "power",
+      "label": "Power",
+      "caption": "Power",
+      "subtitle": "Restart or shut down",
+      "hint": "Open power controls",
+      "mark": "I/O",
+      "color": "6d4c4c",
+      "art": "res://assets/nav/system-panel-v1.svg",
+      "type": "submenu",
+      "enabled": true,
+      "children": [
+        {
+          "id": "restart",
+          "label": "Restart",
+          "caption": "Restart",
+          "subtitle": "Restart this PC",
+          "mark": "RE",
+          "color": "6d4c4c",
+          "type": "command",
+          "executable": "/opt/hearth/launchers/restart.sh",
+          "args": [],
+          "enabled": true
+        },
+        {
+          "id": "shutdown",
+          "label": "Shut Down",
+          "caption": "Shut Down",
+          "subtitle": "Power off this PC",
+          "mark": "OFF",
+          "color": "6d4c4c",
+          "type": "command",
+          "executable": "/opt/hearth/launchers/shutdown.sh",
+          "args": [],
+          "enabled": true
+        }
+      ]
+    }
   ]
 }

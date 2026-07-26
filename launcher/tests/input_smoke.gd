@@ -23,9 +23,11 @@ func _run() -> void:
 
 	var input_manager = hearth.get_node_or_null("InputManager")
 	var input_settings = hearth.get_node_or_null("InputSettings")
+	var library_settings = hearth.get_node_or_null("LibrarySettings")
 	_check(input_manager != null, "input manager is composed into the main scene")
 	_check(input_settings != null, "input settings scene is composed into the main scene")
-	if input_manager == null or input_settings == null:
+	_check(library_settings != null, "library settings scene is composed into the main scene")
+	if input_manager == null or input_settings == null or library_settings == null:
 		_finish()
 		return
 

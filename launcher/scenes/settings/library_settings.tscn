@@ -1,0 +1,152 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource path="res://scripts/settings/library_settings.gd" type="Script" id="1"]
+
+[node name="LibrarySettings" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+z_index = 110
+script = ExtResource("1")
+
+[node name="Dim" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.035, 0.055, 0.09, 0.96)
+
+[node name="Panel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_left = 0.16
+anchor_top = 0.045
+anchor_right = 0.84
+anchor_bottom = 0.955
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Margin" type="MarginContainer" parent="Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 42
+theme_override_constants/margin_top = 30
+theme_override_constants/margin_right = 42
+theme_override_constants/margin_bottom = 30
+
+[node name="Content" type="VBoxContainer" parent="Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="Panel/Margin/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.949, 0.663, 0.231, 1)
+theme_override_font_sizes/font_size = 38
+text = "Library & launchers"
+
+[node name="Description" type="Label" parent="Panel/Margin/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.686, 0.725, 0.784, 1)
+theme_override_font_sizes/font_size = 17
+text = "Hearth works automatically, but you can choose XBMC-style folder artwork, preserve physical folders, and select compatible installed RetroArch cores."
+autowrap_mode = 2
+
+[node name="General" type="GridContainer" parent="Panel/Margin/Content"]
+layout_mode = 2
+columns = 2
+theme_override_constants/h_separation = 24
+theme_override_constants/v_separation = 8
+
+[node name="FolderArtLabel" type="Label" parent="Panel/Margin/Content/General"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 19
+text = "Folder artwork"
+
+[node name="FolderArt" type="OptionButton" parent="Panel/Margin/Content/General"]
+custom_minimum_size = Vector2(650, 48)
+layout_mode = 2
+theme_override_font_sizes/font_size = 17
+
+[node name="WallpaperLabel" type="Label" parent="Panel/Margin/Content/General"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 19
+text = "Folder wallpapers"
+
+[node name="FolderWallpapers" type="CheckButton" parent="Panel/Margin/Content/General"]
+custom_minimum_size = Vector2(650, 48)
+layout_mode = 2
+theme_override_font_sizes/font_size = 17
+text = "Use wallpaper images from library folders"
+
+[node name="PreserveLabel" type="Label" parent="Panel/Margin/Content/General"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 19
+text = "Library branches"
+
+[node name="PreserveFolders" type="CheckButton" parent="Panel/Margin/Content/General"]
+custom_minimum_size = Vector2(650, 48)
+layout_mode = 2
+theme_override_font_sizes/font_size = 17
+text = "Keep subfolders as browsable folders"
+
+[node name="FullscreenLabel" type="Label" parent="Panel/Margin/Content/General"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 19
+text = "RetroArch display"
+
+[node name="Fullscreen" type="CheckButton" parent="Panel/Margin/Content/General"]
+custom_minimum_size = Vector2(650, 48)
+layout_mode = 2
+theme_override_font_sizes/font_size = 17
+text = "Launch games fullscreen"
+
+[node name="Status" type="Label" parent="Panel/Margin/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.949, 0.663, 0.231, 1)
+theme_override_font_sizes/font_size = 16
+text = "Defaults work automatically."
+autowrap_mode = 2
+
+[node name="LauncherHeading" type="Label" parent="Panel/Margin/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.949, 0.953, 0.969, 1)
+theme_override_font_sizes/font_size = 23
+text = "System launchers"
+
+[node name="LauncherScroll" type="ScrollContainer" parent="Panel/Margin/Content"]
+custom_minimum_size = Vector2(0, 455)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="LauncherRows" type="VBoxContainer" parent="Panel/Margin/Content/LauncherScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 5
+
+[node name="Actions" type="HBoxContainer" parent="Panel/Margin/Content"]
+layout_mode = 2
+alignment = 2
+theme_override_constants/separation = 12
+
+[node name="Reset" type="Button" parent="Panel/Margin/Content/Actions"]
+custom_minimum_size = Vector2(190, 50)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Restore defaults"
+
+[node name="Save" type="Button" parent="Panel/Margin/Content/Actions"]
+custom_minimum_size = Vector2(150, 50)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Save"
+
+[node name="Close" type="Button" parent="Panel/Margin/Content/Actions"]
+custom_minimum_size = Vector2(150, 50)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Cancel"

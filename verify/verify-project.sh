@@ -5,6 +5,11 @@ jq -e '.schema_version == 2 and (.items | type == "array")' "${root}/launcher/co
 jq -e '.title == "Home"' "${root}/launcher/config/menu.json" >/dev/null
 jq -e '
   ([.items[].id] | index("maintenance") | not) and
+  ([.items[].id] == ["games", "movies-tv", "settings", "power"]) and
+  (.items[] | select(.id == "games") |
+    .type == "submenu" and
+    ([.children[].id] == ["my-library", "steam"])
+  ) and
   (.items[] | select(.id == "settings") |
     .type == "submenu" and
     ([.children[].id] | contains(["controllers-remotes", "desktop-settings"]))
@@ -18,7 +23,10 @@ jq -e '.schema_version == 1 and .adapters.steam == "native" and .adapters.retroa
 jq -e '.schema_version == 1 and .adapters.keyboard_navigation.outputs.home == "bridge:return_to_hearth"' "${root}/launcher/config/input-adapters.json" >/dev/null
 jq -e --slurpfile menu "${root}/launcher/config/menu.json" '
   .destinations as $destinations |
-  ($menu[0].items[] | select(.id == "streaming").children | all(.id as $id | $destinations | has($id))) and
+  ($menu[0].items[] | select(.id == "movies-tv").children |
+    map(select(.type == "command")) |
+    all(.id as $id | $destinations | has($id))
+  ) and
   ($destinations.plex == "plex")
 ' "${root}/launcher/config/app-input-policy.json" >/dev/null
 for launcher in "${root}"/launchers/*.sh; do
@@ -51,6 +59,13 @@ rg -q 'DisplayServer.window_is_focused' "${root}/launcher/scripts/main.gd"
 rg -q 'NOTIFICATION_APPLICATION_FOCUS_IN' "${root}/launcher/scripts/main.gd"
 rg -q 'caption.*game_title' "${root}/launcher/scripts/main.gd"
 rg -q 'retroarch.*thumbnails' "${root}/launcher/scripts/main.gd"
+rg -q 'func _find_folder_art' "${root}/launcher/scripts/main.gd"
+rg -q 'func _find_folder_wallpaper' "${root}/launcher/scripts/main.gd"
+rg -q 'core_options' "${root}/launcher/config/system-registry.json"
+if "${root}/launchers/retroarch-game.sh" nestopia_libretro.so /nonexistent invalid-mode >/dev/null 2>&1; then
+  printf '%s\n' 'RetroArch launcher accepted an invalid display mode.' >&2
+  exit 1
+fi
 rg -q 'run-with-input-bridge.sh.*destination_id' "${root}/launchers/browser-service.sh"
 rg -q -- '--enable-spatial-navigation' "${root}/launchers/browser-service.sh"
 rg -q -- '--load-extension=' "${root}/launchers/browser-service.sh"
@@ -67,7 +82,16 @@ for module in \
   scripts/input/input_manager.gd \
   scripts/settings/input_settings.gd \
   scenes/settings/input_settings.tscn \
+  scripts/settings/streaming_service_store.gd \
+  scripts/settings/streaming_services.gd \
+  scenes/settings/streaming_services.tscn \
+  scripts/settings/library_settings_store.gd \
+  scripts/settings/library_settings.gd \
+  scenes/settings/library_settings.tscn \
   tests/library_smoke.gd \
+  tests/library_browser_smoke.gd \
+  tests/library_settings_smoke.gd \
+  tests/menu_smoke.gd \
   tests/input_smoke.gd; do
   test -f "${root}/launcher/${module}"
 done
@@ -79,8 +103,11 @@ python3 -m compileall -q "${root}/input_bridge"
 PYTHONPATH="${root}" python3 -m unittest discover -s "${root}/input_bridge/tests"
 if command -v godot >/dev/null 2>&1; then
   godot --headless --path "${root}/launcher" --import
+  godot --headless --path "${root}/launcher" --script res://tests/menu_smoke.gd
   godot --headless --path "${root}/launcher" --script res://tests/input_smoke.gd
   godot --headless --path "${root}/launcher" --script res://tests/library_smoke.gd
+  godot --headless --path "${root}/launcher" --script res://tests/library_browser_smoke.gd
+  godot --headless --path "${root}/launcher" --script res://tests/library_settings_smoke.gd
 fi
 test -f "${root}/launcher/assets/backgrounds/arcade-living-room-v4.png"
 rg -q 'res://assets/backgrounds/arcade-living-room-v4.png' "${root}/launcher/scripts/main.gd"
