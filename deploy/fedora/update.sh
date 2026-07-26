@@ -62,7 +62,7 @@ printf 'Update installed successfully.\n'
 printf 'Backup: %s\n' "${backup_root}"
 printf 'Personal library preserved: %s\n' "${library_root}"
 printf 'Local settings and browser profiles were not modified.\n'
-printf 'Rollback: sudo systemctl --user stop hearth.service; sudo mv %s %s.failed; sudo cp -a %s %s\n' \
+printf 'Rollback: systemctl --user stop hearth.service; sudo mv %s %s.failed; sudo cp -a %s %s; systemctl --user start hearth.service\n' \
   "${install_root}" "${install_root}" "${backup_root}" "${install_root}"
 if [[ "${HEARTH_DRY_RUN}" != "1" && "${HEARTH_SKIP_DOCTOR:-0}" != "1" ]]; then
   "${install_root}/deploy/fedora/doctor.sh" || {

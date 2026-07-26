@@ -7,6 +7,7 @@ import argparse
 import importlib.util
 import json
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -92,6 +93,24 @@ def readable_version(command: Iterable[str]) -> str:
     return (result.stdout or result.stderr).splitlines()[0][:160] if (result.stdout or result.stderr) else ""
 
 
+def display_resolution() -> str:
+    override = os.environ.get("HEARTH_DISPLAY_RESOLUTION", "")
+    if override:
+        return override[:80]
+    gdctl = command_path("gdctl")
+    if gdctl:
+        try:
+            result = subprocess.run(
+                [gdctl, "show"], check=False, capture_output=True, text=True, timeout=3
+            )
+            match = re.search(r"\b(\d{3,5}x\d{3,5}@[\d.]+)\b", result.stdout)
+            if match:
+                return match.group(1)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    return ""
+
+
 def load_os_release(path: Path) -> dict[str, str]:
     values: dict[str, str] = {}
     try:
@@ -172,9 +191,7 @@ def build_report(args: argparse.Namespace) -> Report:
     else:
         report.add("session", "Display session", "WARNING", "No graphical session detected", "Run diagnostics from the logged-in media account.")
 
-    resolution = os.environ.get("HEARTH_DISPLAY_RESOLUTION", "")
-    if not resolution and command_path("gnome-randr"):
-        resolution = readable_version(["gnome-randr", "query"])
+    resolution = display_resolution()
     report.add(
         "display", "Display", "PASS" if resolution else "WARNING",
         resolution[:80] if resolution else "Resolution unavailable in this process",
