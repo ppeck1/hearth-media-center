@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ "$#" -ne 2 ]]; then
-  printf '%s\n' 'Usage: retroarch-game.sh CORE_FILE ROM_PATH' >&2
+if [[ "$#" -lt 2 || "$#" -gt 3 ]]; then
+  printf '%s\n' 'Usage: retroarch-game.sh CORE_FILE ROM_PATH [fullscreen|windowed]' >&2
   exit 64
 fi
 
 core_file="$1"
 rom_path="$2"
+display_mode="${3:-fullscreen}"
+if [[ "${display_mode}" != "fullscreen" && "${display_mode}" != "windowed" ]]; then
+  printf '%s\n' 'Display mode must be fullscreen or windowed.' >&2
+  exit 64
+fi
 if [[ ! "${core_file}" =~ ^[A-Za-z0-9._-]+_libretro\.so$ ]]; then
   printf '%s\n' 'Invalid RetroArch core name.' >&2
   exit 65
@@ -34,4 +39,8 @@ rom_path="$(realpath -e -- "${rom_path}")"
 case "${rom_path}" in /srv/library/games/roms/*) ;; *) printf '%s\n' 'Game path is outside Hearth personal library.' >&2; exit 66;; esac
 test -r "${core_path}"
 test -r "${rom_path}"
-exec /usr/bin/retroarch --fullscreen -L "${core_path}" "${rom_path}"
+retroarch_args=(-L "${core_path}" "${rom_path}")
+if [[ "${display_mode}" == "fullscreen" ]]; then
+  retroarch_args=(--fullscreen "${retroarch_args[@]}")
+fi
+exec /usr/bin/retroarch "${retroarch_args[@]}"
