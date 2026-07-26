@@ -123,16 +123,19 @@ var input_rearm_at_msec := 0
 @onready var library_browser = $LibraryBrowser
 @onready var streaming_services = $StreamingServices
 @onready var library_settings = $LibrarySettings
+@onready var system_health = $SystemHealth
 
 func _ready() -> void:
     input_rearm_at_msec = Time.get_ticks_msec() + 450
     input_settings.closed.connect(_on_input_settings_closed)
     library_browser.launch_requested.connect(_on_library_launch_requested)
+    library_browser.refresh_requested.connect(_on_library_refresh_requested)
     library_browser.closed.connect(_on_library_closed)
     streaming_services.save_requested.connect(_on_streaming_services_save_requested)
     streaming_services.closed.connect(_on_streaming_services_closed)
     library_settings.save_requested.connect(_on_library_settings_save_requested)
     library_settings.closed.connect(_on_library_settings_closed)
+    system_health.closed.connect(_on_system_health_closed)
     library_activity_store = LibraryActivityStore.new()
     library_activity_store.reload()
     streaming_service_store = StreamingServiceStore.new()
@@ -143,11 +146,13 @@ func _ready() -> void:
     input_settings.z_index = 100
     streaming_services.z_index = 110
     library_settings.z_index = 110
+    system_health.z_index = 120
     modal.z_index = 200
     move_child(library_browser, get_child_count() - 1)
     move_child(input_settings, get_child_count() - 1)
     move_child(streaming_services, get_child_count() - 1)
     move_child(library_settings, get_child_count() - 1)
+    move_child(system_health, get_child_count() - 1)
     move_child(modal, get_child_count() - 1)
     _load_registry()
     _load_home()
@@ -718,6 +723,9 @@ func _activate(item: Dictionary, card: Button) -> void:
         elif panel_id == "streaming_services":
             streaming_services.open_panel(_manageable_streaming_services(), streaming_service_store.enabled_ids)
             footer.text = "Movies & TV services"
+        elif panel_id == "system_health":
+            system_health.open_panel(_active_profile_label())
+            footer.text = "System health"
         else:
             _show_error("This settings panel is not available yet.")
         return
@@ -783,6 +791,11 @@ func _on_library_launch_requested(item: Dictionary) -> void:
 func _on_library_closed() -> void:
     if is_instance_valid(last_button):
         last_button.grab_focus()
+
+func _on_library_refresh_requested() -> void:
+    library_activity_store.reload()
+    library_browser.open_library(_library_systems(), library_activity_store)
+    footer.text = "Library refreshed"
 
 func _library_systems() -> Array:
     system_folder_art.clear()
@@ -1332,6 +1345,10 @@ func _unhandled_input(event: InputEvent) -> void:
         streaming_services.handle_unhandled_input(event, input_manager)
         get_viewport().set_input_as_handled()
         return
+    if system_health.visible:
+        system_health.handle_unhandled_input(event, input_manager)
+        get_viewport().set_input_as_handled()
+        return
     if input_manager.action_pressed(event, "home") and not stack.is_empty():
         stack.clear()
         _load_home()
@@ -1418,6 +1435,24 @@ func _on_library_settings_closed() -> void:
         footer.text = "Returned to Hearth"
     if is_instance_valid(last_button):
         last_button.grab_focus()
+
+func _on_system_health_closed() -> void:
+    footer.text = "Returned to Hearth"
+    if is_instance_valid(last_button):
+        last_button.grab_focus()
+
+func _active_profile_label() -> String:
+    var devices: Array[Dictionary] = input_manager.connected_devices()
+    for device in devices:
+        if bool(device.get("keyboard_like", false)):
+            continue
+        var profile_id: String = str(input_manager.suggested_profile_for_device(device))
+        return "%s • %s" % [
+            input_manager.store.profile_label(profile_id),
+            str(device.get("name", "Controller")).left(60),
+        ]
+    var fallback_id := str(input_manager.store.data.get("default_profiles", {}).get("keyboard", "standard_remote"))
+    return "%s • keyboard / remote fallback" % input_manager.store.profile_label(fallback_id)
 
 func _launcher_system_options() -> Array:
     var result: Array = []

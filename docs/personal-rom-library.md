@@ -1,6 +1,6 @@
 # Personal ROM library
 
-Hearth reads only the local directory `/srv/library/games/roms`. Add a folder per system, then copy your own files below it. The interface discovers ROMs every time **Games → My Library** opens; there is no import database to maintain, no ROM names are stored in this repository, and no files are uploaded. Folder aliases are consolidated into families: `gb`, `gbc`, and `gba` appear under **Nintendo → Game Boy**; `md`, `segacd`, and related folders appear under **Sega**.
+Hearth reads only the local directory `/srv/library/games/roms`. Add a folder per system, then copy your own files below it. The interface discovers ROMs every time **Games → My Library** opens and when **Refresh Library** is selected in the drawer; there is no import database to maintain, no ROM names are stored in this repository, and no files are uploaded. Folder aliases are consolidated into families: `gb`, `gbc`, and `gba` appear under **Nintendo → Game Boy**; `md`, `segacd`, and related folders appear under **Sega**.
 
 All defined systems from the Dreamcast/GameCube era and earlier appear as placeholders even before ROMs are added. Files in an unmapped folder still appear under **Unmapped Library** so nothing is hidden. Hearth accepts configured Libretro cores from `~/.config/retroarch/cores` and `/usr/lib64/libretro`; core and folder assignments live in `launcher/config/system-registry.json`. `tools/install-retroarch-cores.sh` installs missing generic cores from Libretro's official HTTPS buildbot without reading the ROM library.
 

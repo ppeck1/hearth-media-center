@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource path="res://scripts/main.gd" type="Script" id="1"]
 [ext_resource path="res://scripts/input/input_manager.gd" type="Script" id="2"]
@@ -6,6 +6,7 @@
 [ext_resource path="res://scenes/library/library_browser.tscn" type="PackedScene" id="4"]
 [ext_resource path="res://scenes/settings/streaming_services.tscn" type="PackedScene" id="5"]
 [ext_resource path="res://scenes/settings/library_settings.tscn" type="PackedScene" id="6"]
+[ext_resource path="res://scenes/diagnostics/system_health.tscn" type="PackedScene" id="7"]
 
 [node name="Hearth" type="Control"]
 layout_mode = 3
@@ -29,4 +30,7 @@ visible = false
 visible = false
 
 [node name="LibrarySettings" parent="." instance=ExtResource("6")]
+visible = false
+
+[node name="SystemHealth" parent="." instance=ExtResource("7")]
 visible = false

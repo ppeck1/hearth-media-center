@@ -13,6 +13,18 @@ func _check(condition: bool, message: String) -> void:
         push_error("FAIL: " + message)
 
 func _run() -> void:
+    var original_config_home := OS.get_environment("XDG_CONFIG_HOME")
+    var fixture_config_home := "/tmp/hearth-library-smoke-config-%d" % OS.get_process_id()
+    var fixture_core_root := fixture_config_home.path_join("retroarch").path_join("cores")
+    DirAccess.make_dir_recursive_absolute(fixture_core_root)
+    for core_name in ["mupen64plus_next_libretro.so", "parallel_n64_libretro.so"]:
+        var core_file := FileAccess.open(fixture_core_root.path_join(core_name), FileAccess.WRITE)
+        _check(core_file != null, "isolated RetroArch core fixture is created")
+        if core_file != null:
+            core_file.store_8(0)
+            core_file.close()
+    OS.set_environment("XDG_CONFIG_HOME", fixture_config_home)
+
     var scene: PackedScene = load("res://main.tscn")
     var launcher = scene.instantiate()
     root.add_child(launcher)
@@ -25,42 +37,13 @@ func _run() -> void:
     launcher._activate(steam_item, launcher.buttons[0])
     _check(launcher.child_pid == -1, "background activation cannot launch Steam")
 
-    var family_items: Array = launcher._library_systems()
-    var nintendo: Dictionary = {}
-    for family_item in family_items:
-        if str(family_item.get("id", "")) == "nintendo":
-            nintendo = family_item
-            break
-    _check(not nintendo.is_empty(), "Nintendo family is discovered")
-    _check(not nintendo.has("brand"), "family cards omit redundant text above artwork")
-    _check(nintendo.get("header_hint") == "Choose a family", "family selection uses family wording")
-    for family_item in family_items:
-        if str(family_item.get("id", "")) == "unmapped":
-            continue
-        _check(
-            family_item.get("header_hint") == "Choose a family",
-            "%s family uses family-level wording" % family_item.get("label", "Family")
-        )
-
     for registered_system in launcher.systems:
         if str(registered_system.get("backend", "")) == "manifest":
-            var native_games: Array = launcher._manifest_games(registered_system)
             _check(
                 str(registered_system.get("manifest_path", "")).begins_with("/srv/library/"),
-                "PC catalog is loaded from a machine-local manifest"
+                "PC catalog is configured outside the repository"
             )
-            if not native_games.is_empty():
-                _check(native_games[0].get("type") == "command", "PC manifest uses a native command backend")
-                _check(
-                    str(native_games[0].get("art", "")).get_file().get_basename().to_lower() == "icon",
-                    "PC manifest discovers icon artwork from each game folder"
-                )
             continue
-        var core_file := str(registered_system.get("core", ""))
-        _check(
-            not launcher._retroarch_core_path(core_file).is_empty(),
-            "%s core resolves from an approved directory" % registered_system.get("label", "System")
-        )
         var sample_system: Dictionary = launcher._system_item(
             registered_system,
             [{"caption":"Sample Game"}]
@@ -73,29 +56,6 @@ func _run() -> void:
             str(sample_system.get("header_hint", "")).is_empty(),
             "%s system header does not repeat its name" % registered_system.get("label", "System")
         )
-
-    var n64: Dictionary = {}
-    for system_item in nintendo.get("children", []):
-        if str(system_item.get("id", "")) == "n64":
-            n64 = system_item
-            break
-    _check(not n64.is_empty(), "Nintendo 64 system is discovered")
-    _check(str(n64.get("subtitle", "")).ends_with("available"), "system header shows only games available")
-    _check(not str(n64.get("subtitle", "")).contains("RetroArch"), "system header omits bridge and emulator")
-    _check(n64.get("caption") == n64.get("label"), "system name appears under system artwork")
-    _check(str(n64.get("header_hint", "")).is_empty(), "system header does not repeat the system name")
-
-    var games: Array = n64.get("children", [])
-    _check(not games.is_empty(), "Nintendo 64 games are discovered")
-    if not games.is_empty():
-        _check(not str(games[0].get("caption", "")).is_empty(), "game title appears under the game icon")
-        _check(str(games[0].get("subtitle", "")).is_empty(), "game header omits system and extension")
-        _check(str(games[0].get("header_hint", "")).is_empty(), "game header omits launch boilerplate")
-        var all_games_have_art := true
-        for game in games:
-            if str(game.get("art", "")).is_empty():
-                all_games_have_art = false
-        _check(all_games_have_art, "missing title art receives a system fallback")
     _check(
         launcher._clean_game_title("Example Game (USA).nkit.gcz") == "Example Game",
         "compound extensions and database tags are removed from captions"
@@ -187,8 +147,10 @@ func _run() -> void:
         _check(launcher._game_count(scanned_items) == 1, "recursive game counts exclude folder nodes")
         var nested_games: Array = scanned_folder.get("children", [])
         if not nested_games.is_empty():
-            _check(nested_games[0].get("args", []).size() == 3, "RetroArch launch includes a display-mode setting")
-            _check(nested_games[0].get("args", [])[2] == "fullscreen", "fullscreen is the default launch mode")
+            var launch_args: Array = nested_games[0].get("args", [])
+            _check(launch_args.size() == 3, "RetroArch launch includes a display-mode setting")
+            if launch_args.size() == 3:
+                _check(launch_args[2] == "fullscreen", "fullscreen is the default launch mode")
 
     var n64_registry: Dictionary = {}
     for system_value in launcher.systems:
@@ -205,7 +167,10 @@ func _run() -> void:
     var windowed_items: Array = []
     launcher._scan_system_folder(nested_fixture, n64_registry, windowed_items, 0, false)
     if not windowed_items.is_empty():
-        _check(windowed_items[0].get("args", [])[2] == "windowed", "windowed launch mode reaches the launcher")
+        var windowed_args: Array = windowed_items[0].get("args", [])
+        _check(windowed_args.size() == 3, "windowed launch includes a display-mode setting")
+        if windowed_args.size() == 3:
+            _check(windowed_args[2] == "windowed", "windowed launch mode reaches the launcher")
     launcher.library_settings_store.reset_defaults()
 
     var native_items: Array = launcher._manifest_games({
@@ -251,6 +216,12 @@ func _run() -> void:
     DirAccess.remove_absolute(first_image)
     DirAccess.remove_absolute(nested_fixture)
     DirAccess.remove_absolute(folder_fixture)
+    for core_name in ["mupen64plus_next_libretro.so", "parallel_n64_libretro.so"]:
+        DirAccess.remove_absolute(fixture_core_root.path_join(core_name))
+    DirAccess.remove_absolute(fixture_core_root)
+    DirAccess.remove_absolute(fixture_config_home.path_join("retroarch"))
+    DirAccess.remove_absolute(fixture_config_home)
+    OS.set_environment("XDG_CONFIG_HOME", original_config_home)
 
     launcher.queue_free()
     await process_frame

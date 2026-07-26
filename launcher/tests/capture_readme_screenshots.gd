@@ -101,8 +101,28 @@ func _capture_all() -> void:
 	await _settle(0.4)
 	if not _save("library-settings.png"):
 		return
+	hearth.library_settings._close_without_saving()
+
+	var diagnostic_fixture := "/tmp/hearth-readme-system-health.json"
+	var diagnostic_file := FileAccess.open(diagnostic_fixture, FileAccess.WRITE)
+	if diagnostic_file == null:
+		printerr("Could not create the System Health screenshot fixture.")
+		quit(1)
+		return
+	diagnostic_file.store_string(JSON.stringify(_demo_health_report(), "  ") + "\n")
+	diagnostic_file.close()
+	OS.set_environment("HEARTH_DIAGNOSTIC_REPORT", diagnostic_fixture)
+	hearth.system_health.open_panel("Standard Remote • demo fixture")
+	await _settle(0.5)
+	if not _save("system-health.png"):
+		return
+	hearth.system_health._close()
+	OS.set_environment("HEARTH_DIAGNOSTIC_REPORT", "")
+	DirAccess.remove_absolute(diagnostic_fixture)
 
 	print("README screenshots captured in " + ProjectSettings.globalize_path(OUTPUT_DIRECTORY))
+	hearth.queue_free()
+	await process_frame
 	quit(0)
 
 func _show_section(hearth, item_id: String, title: String) -> void:
@@ -164,6 +184,27 @@ func _demo_library() -> Array:
 		"art":"res://assets/brands/classics-wordmark-v1.svg",
 		"children":[system]
 	}]
+
+func _demo_health_report() -> Dictionary:
+	return {
+		"schema_version": 1,
+		"generated_at": "2026-07-26T12:00:00Z",
+		"summary": {"exit_code": 0},
+		"checks": [
+			{"id":"installation","label":"Hearth installation","status":"PASS","explanation":"Project and bounded helpers are installed","remediation":""},
+			{"id":"godot","label":"Godot runtime","status":"PASS","explanation":"Godot 4 runtime is available","remediation":""},
+			{"id":"retroarch","label":"RetroArch","status":"PASS","explanation":"RetroArch is available","remediation":""},
+			{"id":"libretro_cores","label":"Libretro cores","status":"PASS","explanation":"6 compatible core files detected","remediation":""},
+			{"id":"steam","label":"Steam","status":"PASS","explanation":"Steam is available","remediation":""},
+			{"id":"plex","label":"Plex HTPC","status":"WARNING","explanation":"Plex HTPC Flatpak is not installed","remediation":"Install Plex HTPC only if this destination is required."},
+			{"id":"browser","label":"Supported browser","status":"PASS","explanation":"Supported browser is available","remediation":""},
+			{"id":"rom_library","label":"ROM library","status":"PASS","explanation":"Readable; 12 fictional fixture games detected","remediation":""},
+			{"id":"input_bridge","label":"Input bridge","status":"NOT APPLICABLE","explanation":"Idle until a translated destination opens","remediation":""},
+			{"id":"uinput","label":"/dev/uinput","status":"PASS","explanation":"Active user can create the bounded virtual keyboard","remediation":""},
+			{"id":"session","label":"Display session","status":"PASS","explanation":"Wayland session detected","remediation":""},
+			{"id":"autostart","label":"Launch at login","status":"PASS","explanation":"systemd user service enabled","remediation":""},
+		],
+	}
 
 func _settle(seconds: float) -> void:
 	await process_frame

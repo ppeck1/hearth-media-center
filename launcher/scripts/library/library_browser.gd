@@ -4,6 +4,7 @@ extends Control
 ## and launching; this overlay only presents the supplied dictionaries.
 
 signal launch_requested(item: Dictionary)
+signal refresh_requested
 signal closed
 
 const INK := Color("101827")
@@ -372,6 +373,7 @@ func _build_drawer() -> void:
     if _drawer_level == 0:
         _drawer_title.text = "SYSTEM FAMILIES"
         _drawer_items.append({"kind":"home", "label":"Home"})
+        _drawer_items.append({"kind":"refresh", "label":"↻ Refresh Library"})
         for family_value in _families:
             var family: Dictionary = family_value
             _drawer_items.append({"kind":"family", "label":str(family.get("label", "Systems")), "item":family})
@@ -547,7 +549,7 @@ func _family_drawer_index(family: Dictionary) -> int:
     var family_id := str(family.get("id", ""))
     for index in range(_families.size()):
         if str(_families[index].get("id", "")) == family_id:
-            return index + 1 # Home occupies drawer index zero.
+            return index + 2 # Home and Refresh occupy the first two drawer entries.
     return 0
 
 func _accept_selection() -> void:
@@ -568,6 +570,8 @@ func _accept_selection() -> void:
     match str(entry.get("kind", "")):
         "home":
             _show_home()
+        "refresh":
+            refresh_requested.emit()
         "family":
             _current_family = entry.get("item", {})
             _drawer_level = 1

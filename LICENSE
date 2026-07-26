@@ -1,0 +1,24 @@
+Hearth Media Center — license decision pending
+
+No open-source or freeware license has been selected for this repository.
+Copyright holders reserve all rights. The presence of source code in a public
+repository does not grant permission to use, copy, modify, redistribute, or
+create derivative works except where applicable law independently permits it.
+
+Maintainer decision required before a public alpha release
+==========================================================
+
+Reasonable choices include:
+
+1. GPL-3.0-or-later, if derivative distributions should remain under the same
+   license and provide corresponding source.
+2. MPL-2.0, if file-level copyleft is preferred while allowing combination
+   with differently licensed work.
+3. Apache-2.0, if a permissive license with an express patent grant is
+   preferred.
+4. MIT, if a short permissive license without an express patent grant is
+   preferred.
+
+The maintainer should review bundled artwork provenance and third-party brand
+usage separately from the code license. Replace this notice with the complete
+chosen license text only after that decision is recorded.
