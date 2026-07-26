@@ -165,7 +165,7 @@ if rg -n -e '<image' -e 'data:image' "${root}/launcher/assets/logos/"*'-panel-v1
   exit 1
 fi
 absolute_home_marker="/h""ome/"
-if rg -n -i -e "${absolute_home_marker}" -e 'C:\\Users\\' -e 'BEGIN [A-Z ]*PRIVATE KEY' -e '\bsk-[A-Za-z0-9_-]{20,}\b' "${root}" --glob '!.git/**' --glob '!launcher/.godot/**'; then
+if rg -n -i -e "${absolute_home_marker}" -e 'C:[\\]Users[\\]' -e 'BEGIN [A-Z ]*PRIVATE KEY' -e '\bsk-[A-Za-z0-9_-]{20,}\b' "${root}" --glob '!.git/**' --glob '!launcher/.godot/**'; then
   printf '%s\n' 'Personal information marker found.' >&2
   exit 1
 fi
