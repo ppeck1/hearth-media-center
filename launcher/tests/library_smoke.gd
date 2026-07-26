@@ -13,6 +13,18 @@ func _check(condition: bool, message: String) -> void:
         push_error("FAIL: " + message)
 
 func _run() -> void:
+    var original_config_home := OS.get_environment("XDG_CONFIG_HOME")
+    var fixture_config_home := "/tmp/hearth-library-smoke-config-%d" % OS.get_process_id()
+    var fixture_core_root := fixture_config_home.path_join("retroarch").path_join("cores")
+    DirAccess.make_dir_recursive_absolute(fixture_core_root)
+    for core_name in ["mupen64plus_next_libretro.so", "parallel_n64_libretro.so"]:
+        var core_file := FileAccess.open(fixture_core_root.path_join(core_name), FileAccess.WRITE)
+        _check(core_file != null, "isolated RetroArch core fixture is created")
+        if core_file != null:
+            core_file.store_8(0)
+            core_file.close()
+    OS.set_environment("XDG_CONFIG_HOME", fixture_config_home)
+
     var scene: PackedScene = load("res://main.tscn")
     var launcher = scene.instantiate()
     root.add_child(launcher)
@@ -135,8 +147,10 @@ func _run() -> void:
         _check(launcher._game_count(scanned_items) == 1, "recursive game counts exclude folder nodes")
         var nested_games: Array = scanned_folder.get("children", [])
         if not nested_games.is_empty():
-            _check(nested_games[0].get("args", []).size() == 3, "RetroArch launch includes a display-mode setting")
-            _check(nested_games[0].get("args", [])[2] == "fullscreen", "fullscreen is the default launch mode")
+            var launch_args: Array = nested_games[0].get("args", [])
+            _check(launch_args.size() == 3, "RetroArch launch includes a display-mode setting")
+            if launch_args.size() == 3:
+                _check(launch_args[2] == "fullscreen", "fullscreen is the default launch mode")
 
     var n64_registry: Dictionary = {}
     for system_value in launcher.systems:
@@ -153,7 +167,10 @@ func _run() -> void:
     var windowed_items: Array = []
     launcher._scan_system_folder(nested_fixture, n64_registry, windowed_items, 0, false)
     if not windowed_items.is_empty():
-        _check(windowed_items[0].get("args", [])[2] == "windowed", "windowed launch mode reaches the launcher")
+        var windowed_args: Array = windowed_items[0].get("args", [])
+        _check(windowed_args.size() == 3, "windowed launch includes a display-mode setting")
+        if windowed_args.size() == 3:
+            _check(windowed_args[2] == "windowed", "windowed launch mode reaches the launcher")
     launcher.library_settings_store.reset_defaults()
 
     var native_items: Array = launcher._manifest_games({
@@ -199,6 +216,12 @@ func _run() -> void:
     DirAccess.remove_absolute(first_image)
     DirAccess.remove_absolute(nested_fixture)
     DirAccess.remove_absolute(folder_fixture)
+    for core_name in ["mupen64plus_next_libretro.so", "parallel_n64_libretro.so"]:
+        DirAccess.remove_absolute(fixture_core_root.path_join(core_name))
+    DirAccess.remove_absolute(fixture_core_root)
+    DirAccess.remove_absolute(fixture_config_home.path_join("retroarch"))
+    DirAccess.remove_absolute(fixture_config_home)
+    OS.set_environment("XDG_CONFIG_HOME", original_config_home)
 
     launcher.queue_free()
     await process_frame

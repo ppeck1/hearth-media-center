@@ -11,6 +11,26 @@ case "${mode}" in
     ;;
 esac
 
+run_bounded() {
+  local label="$1"
+  local limit="$2"
+  local status=0
+  shift 2
+
+  printf '\n==> %s\n' "${label}"
+  if ! command -v timeout >/dev/null 2>&1; then
+    "$@"
+    return
+  fi
+  timeout --foreground --kill-after=10s "${limit}" "$@" || status=$?
+  if (( status == 124 || status == 137 )); then
+    printf 'Timed out after %s: %s\n' "${limit}" "${label}" >&2
+  elif (( status != 0 )); then
+    printf 'Failed with exit code %d: %s\n' "${status}" "${label}" >&2
+  fi
+  return "${status}"
+}
+
 if [[ "${mode}" == "--hardware" ]]; then
   printf '%s\n' \
     'Hardware validation is intentionally manual and unclaimed.' \
@@ -139,7 +159,8 @@ if [[ -z "${godot_bin}" || ! -x "${godot_bin}" ]]; then
     'Set HEARTH_GODOT=/path/to/godot, add godot to PATH, or use --fedora with /opt/hearth/runtime/godot.' >&2
   exit 1
 fi
-"${godot_bin}" --headless --path "${root}/launcher" --import
+run_bounded "Godot headless import" 180s \
+  "${godot_bin}" --headless --path "${root}/launcher" --import
 for smoke_test in \
   menu_smoke.gd \
   input_smoke.gd \
@@ -148,7 +169,8 @@ for smoke_test in \
   library_settings_smoke.gd \
   system_health_smoke.gd \
   activity_store_smoke.gd; do
-  "${godot_bin}" --headless --path "${root}/launcher" --script "res://tests/${smoke_test}"
+  run_bounded "Godot smoke test: ${smoke_test}" 90s \
+    "${godot_bin}" --headless --path "${root}/launcher" --script "res://tests/${smoke_test}"
 done
 test -f "${root}/launcher/assets/backgrounds/arcade-living-room-v4.png"
 rg -q 'res://assets/backgrounds/arcade-living-room-v4.png' "${root}/launcher/scripts/main.gd"
