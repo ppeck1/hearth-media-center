@@ -121,6 +121,8 @@ func _capture_all() -> void:
 	DirAccess.remove_absolute(diagnostic_fixture)
 
 	print("README screenshots captured in " + ProjectSettings.globalize_path(OUTPUT_DIRECTORY))
+	hearth.queue_free()
+	await process_frame
 	quit(0)
 
 func _show_section(hearth, item_id: String, title: String) -> void:
