@@ -108,11 +108,15 @@ for module in \
   scripts/settings/library_settings_store.gd \
   scripts/settings/library_settings.gd \
   scenes/settings/library_settings.tscn \
+  scripts/diagnostics/health_report.gd \
+  scripts/diagnostics/system_health.gd \
+  scenes/diagnostics/system_health.tscn \
   tests/library_smoke.gd \
   tests/library_browser_smoke.gd \
   tests/library_settings_smoke.gd \
   tests/menu_smoke.gd \
-  tests/input_smoke.gd; do
+  tests/input_smoke.gd \
+  tests/system_health_smoke.gd; do
   test -f "${root}/launcher/${module}"
 done
 for module in evdev_source.py uinput_sink.py process_runner.py; do
@@ -142,6 +146,7 @@ for smoke_test in \
   library_smoke.gd \
   library_browser_smoke.gd \
   library_settings_smoke.gd \
+  system_health_smoke.gd \
   activity_store_smoke.gd; do
   "${godot_bin}" --headless --path "${root}/launcher" --script "res://tests/${smoke_test}"
 done

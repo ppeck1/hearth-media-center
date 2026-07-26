@@ -232,6 +232,18 @@
           "enabled": true
         },
         {
+          "id": "system-health",
+          "label": "System Health",
+          "caption": "System Health",
+          "subtitle": "Installation, launchers, input, and library diagnostics",
+          "hint": "Inspect appliance readiness",
+          "mark": "OK?",
+          "color": "53705d",
+          "type": "panel",
+          "panel_id": "system_health",
+          "enabled": true
+        },
+        {
           "id": "desktop-settings",
           "label": "Desktop Settings",
           "caption": "Desktop Settings",

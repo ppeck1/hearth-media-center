@@ -68,6 +68,7 @@ func _run() -> void:
     )
     browser.handle_input(&"ui_left")
     browser.handle_input(&"ui_down")
+    browser.handle_input(&"ui_down")
     browser.handle_input(&"ui_accept") # enter Sega family
     _check(browser.debug_state().get("drawer_level") == 1, "family selection opens the system drawer")
     browser.handle_input(&"ui_cancel")
@@ -101,6 +102,16 @@ func _run() -> void:
     )
     browser.handle_input(&"ui_cancel")
     _check(browser.debug_view == "closed", "back from home closes the overlay")
+
+    var refresh_count := [0]
+    browser.refresh_requested.connect(func() -> void:
+        refresh_count[0] += 1
+    )
+    browser.open_library(families)
+    browser.handle_input(&"ui_down")
+    browser.handle_input(&"ui_accept")
+    _check(refresh_count[0] == 1, "Refresh Library is visible in the drawer and emits one bounded rescan request")
+    browser.handle_input(&"ui_cancel")
 
     var launched_ids: Array[String] = []
     browser.launch_requested.connect(func(item: Dictionary) -> void:
