@@ -16,6 +16,7 @@ All notable changes are recorded here. Hearth follows semantic-version-shaped pr
 - A controller-accessible System Health screen backed by a fixed diagnostic helper.
 - Repeatable hardware-validation, architecture, troubleshooting, demonstration, contributing, and release documentation.
 - A visible Refresh Library action in the filesystem library drawer.
+- Smart, full-image, and fill-tile artwork fitting for mixed-aspect game libraries.
 
 ### Existing alpha foundation
 

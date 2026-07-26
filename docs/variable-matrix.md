@@ -7,7 +7,7 @@ This is the complete customization map for Hearth. Use the UI for ordinary chang
 | Goal | Preferred place |
 | --- | --- |
 | Show or hide an existing streaming service | **Movies & TV → Manage Services** |
-| Change folder icons, wallpapers, hierarchy, fullscreen mode, or RetroArch core | **Settings → Library & Launchers** |
+| Change game artwork fit, folder icons, wallpapers, hierarchy, fullscreen mode, or RetroArch core | **Settings → Library & Launchers** |
 | Remap a controller or remote | **Settings → Controllers and Remotes** |
 | Inspect appliance status and remediation | **Settings → System Health** |
 | Add a ROM system or folder alias | [`system-registry.json`](../launcher/config/system-registry.json) |
@@ -30,6 +30,7 @@ Writes use a temporary file and atomic rename. Invalid documents fall back to sa
 | Variable | Type | Default | Allowed values | Effect |
 | --- | --- | --- | --- | --- |
 | `schema_version` | integer | `1` | `1` | Settings document compatibility version |
+| `artwork_fit` | string | `smart` | `smart`, `contain`, `cover` | Automatically avoids harsh cropping, always shows the full image, or fills the tile by cropping edges |
 | `folder_art_mode` | string | `named_or_first` | `disabled`, `named`, `named_or_first` | Disables folder tiles, uses named tiles only, or falls back to the first non-wallpaper image |
 | `folder_wallpapers` | boolean | `true` | `true`, `false` | Enables automatic `wallpaper.*` backgrounds and inheritance |
 | `preserve_folders` | boolean | `true` | `true`, `false` | Shows physical subfolders as branches or flattens them into the system page |

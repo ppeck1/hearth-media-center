@@ -4,6 +4,7 @@ extends RefCounted
 const SCHEMA_VERSION := 1
 const DEFAULTS := {
 	"schema_version": SCHEMA_VERSION,
+	"artwork_fit": "smart",
 	"folder_art_mode": "named_or_first",
 	"folder_wallpapers": true,
 	"preserve_folders": true,
@@ -78,6 +79,10 @@ func folder_art_mode() -> String:
 	return str(data.get("folder_art_mode", "named_or_first"))
 
 
+func artwork_fit() -> String:
+	return str(data.get("artwork_fit", "smart"))
+
+
 func preserve_folders() -> bool:
 	return bool(data.get("preserve_folders", true))
 
@@ -117,6 +122,7 @@ func _normalized(candidate: Dictionary) -> Dictionary:
 				overrides[str(system_id)] = core_file
 	return {
 		"schema_version": SCHEMA_VERSION,
+		"artwork_fit": str(candidate.get("artwork_fit", "smart")),
 		"folder_art_mode": str(candidate.get("folder_art_mode", "named_or_first")),
 		"folder_wallpapers": bool(candidate.get("folder_wallpapers", true)),
 		"preserve_folders": bool(candidate.get("preserve_folders", true)),
@@ -127,6 +133,8 @@ func _normalized(candidate: Dictionary) -> Dictionary:
 
 func _is_valid(candidate: Dictionary) -> bool:
 	if candidate.get("schema_version", 0) != SCHEMA_VERSION:
+		return false
+	if str(candidate.get("artwork_fit", "")) not in ["smart", "contain", "cover"]:
 		return false
 	if str(candidate.get("folder_art_mode", "")) not in ["disabled", "named", "named_or_first"]:
 		return false

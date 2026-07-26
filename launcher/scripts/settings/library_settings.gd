@@ -7,8 +7,10 @@ signal closed
 const PAPER := Color("f3f5f7")
 const MUTED := Color("aeb9c8")
 const AMBER := Color("f2a93b")
+const ARTWORK_FIT_VALUES: Array[String] = ["smart", "contain", "cover"]
 const FOLDER_ART_VALUES: Array[String] = ["disabled", "named", "named_or_first"]
 
+@onready var artwork_fit: OptionButton = $Panel/Margin/Content/General/ArtworkFit
 @onready var folder_art: OptionButton = $Panel/Margin/Content/General/FolderArt
 @onready var folder_wallpapers: CheckButton = $Panel/Margin/Content/General/FolderWallpapers
 @onready var preserve_folders: CheckButton = $Panel/Margin/Content/General/PreserveFolders
@@ -24,6 +26,10 @@ var launcher_systems: Array = []
 
 
 func _ready() -> void:
+	artwork_fit.add_item("Smart — preserve art when cropping would be harsh")
+	artwork_fit.add_item("Show full image — never crop")
+	artwork_fit.add_item("Fill tile — crop edges when needed")
+	artwork_fit.item_selected.connect(_on_setting_changed.unbind(1))
 	folder_art.add_item("Off")
 	folder_art.add_item("Named images: icon, folder, cover, or poster")
 	folder_art.add_item("Named images, then the first image in the folder")
@@ -39,6 +45,7 @@ func _ready() -> void:
 
 func open_panel(settings: Dictionary, system_options: Array) -> void:
 	launcher_systems = system_options.duplicate(true)
+	artwork_fit.select(maxi(0, ARTWORK_FIT_VALUES.find(str(settings.get("artwork_fit", "smart")))))
 	folder_art.select(maxi(0, FOLDER_ART_VALUES.find(str(settings.get("folder_art_mode", "named_or_first")))))
 	folder_wallpapers.button_pressed = bool(settings.get("folder_wallpapers", true))
 	preserve_folders.button_pressed = bool(settings.get("preserve_folders", true))
@@ -46,7 +53,7 @@ func open_panel(settings: Dictionary, system_options: Array) -> void:
 	_rebuild_launcher_rows(settings.get("core_overrides", {}))
 	status_label.text = "Defaults work automatically. Change only what you want to customize."
 	visible = true
-	folder_art.grab_focus()
+	artwork_fit.grab_focus()
 
 
 func handle_unhandled_input(event: InputEvent, input_manager) -> bool:
@@ -120,6 +127,7 @@ func _on_setting_changed() -> void:
 
 
 func _reset() -> void:
+	artwork_fit.select(0)
 	folder_art.select(2)
 	folder_wallpapers.button_pressed = true
 	preserve_folders.button_pressed = true
@@ -138,6 +146,7 @@ func _save() -> void:
 			overrides[system_id] = core_file
 	save_requested.emit({
 		"schema_version": 1,
+		"artwork_fit": ARTWORK_FIT_VALUES[artwork_fit.selected],
 		"folder_art_mode": FOLDER_ART_VALUES[folder_art.selected],
 		"folder_wallpapers": folder_wallpapers.button_pressed,
 		"preserve_folders": preserve_folders.button_pressed,

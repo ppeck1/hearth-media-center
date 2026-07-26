@@ -9,9 +9,13 @@ func _init() -> void:
 
 func _run() -> void:
     var temporary_art := "/tmp/hearth-library-browser-smoke.png"
+    var wide_art := "/tmp/hearth-library-browser-wide-smoke.png"
     var image := Image.create(8, 8, false, Image.FORMAT_RGBA8)
     image.fill(Color.WHITE)
     _check(image.save_png(temporary_art) == OK, "temporary external cover is created")
+    var wide_image := Image.create(149, 100, false, Image.FORMAT_RGBA8)
+    wide_image.fill(Color.WHITE)
+    _check(wide_image.save_png(wide_art) == OK, "near-tile-ratio cover is created")
     var browser = BrowserScene.instantiate()
     root.add_child(browser)
     await process_frame
@@ -24,6 +28,7 @@ func _run() -> void:
             "type":"command"
         })
     games[0]["art"] = temporary_art
+    games[1]["art"] = wide_art
     games[12]["art"] = temporary_art
     var families := [{
         "id":"sega",
@@ -85,8 +90,36 @@ func _run() -> void:
     _check(state.get("page_count") == 1, "each system uses one scrollable page")
     _check(state.get("instantiated_cards") == 790, "the scrollable grid contains every game")
     var first_art: TextureRect = browser._card_buttons[0].get_meta("art_node")
+    var second_art: TextureRect = browser._card_buttons[1].get_meta("art_node")
     var first_mark: Label = browser._card_buttons[0].get_meta("mark_node")
     _check(first_art.texture != null and not first_mark.visible, "system grid displays visible external covers")
+    _check(
+        first_art.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_CENTERED,
+        "Smart fit preserves a square cover when the tile would crop it harshly"
+    )
+    _check(
+        second_art.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_COVERED,
+        "Smart fit fills the tile when the artwork ratio is already a close match"
+    )
+    browser._artwork_fit_mode = "cover"
+    browser._apply_artwork_fit(first_art)
+    _check(
+        first_art.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_COVERED,
+        "Fill tile mode deliberately crops mismatched artwork"
+    )
+    browser._artwork_fit_mode = "contain"
+    browser._apply_artwork_fit(second_art)
+    _check(
+        second_art.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_CENTERED,
+        "Show full image mode never crops a close-ratio cover"
+    )
+    browser._artwork_fit_mode = "cover"
+    browser._apply_artwork_fit(first_art, "contain")
+    _check(
+        first_art.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_CENTERED,
+        "automatic fallback artwork can still require full-image fitting"
+    )
+    browser._artwork_fit_mode = "smart"
     browser.handle_input(&"page_next")
     _check(browser.debug_state().get("content_index") == 24, "page-next moves down one visible screen")
     browser.handle_input(&"page_prev")
@@ -156,6 +189,7 @@ func _run() -> void:
     )
     browser.queue_free()
     DirAccess.remove_absolute(temporary_art)
+    DirAccess.remove_absolute(wide_art)
     if failures == 0:
         print("library_browser_smoke: PASS")
         quit(0)

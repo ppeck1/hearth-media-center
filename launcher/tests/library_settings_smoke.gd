@@ -18,12 +18,14 @@ func _run() -> void:
 
 	var store = Store.new()
 	_check(store.load_settings(), "missing settings use beginner-friendly defaults")
+	_check(store.artwork_fit() == "smart", "game artwork uses Smart fit by default")
 	_check(store.folder_art_mode() == "named_or_first", "folder images are automatic by default")
 	_check(store.folder_wallpapers(), "folder wallpapers are automatic by default")
 	_check(store.preserve_folders(), "physical library branches are preserved by default")
 	_check(store.retroarch_fullscreen(), "RetroArch launches fullscreen by default")
 	_check(store.save_settings({
 		"schema_version": 1,
+		"artwork_fit": "contain",
 		"folder_art_mode": "named",
 		"folder_wallpapers": false,
 		"preserve_folders": false,
@@ -33,6 +35,7 @@ func _run() -> void:
 
 	var reloaded = Store.new()
 	_check(reloaded.load_settings(), "saved library settings reload")
+	_check(reloaded.artwork_fit() == "contain", "game artwork fit preference persists")
 	_check(reloaded.folder_art_mode() == "named", "folder artwork mode persists")
 	_check(not reloaded.folder_wallpapers(), "folder wallpaper preference persists")
 	_check(not reloaded.preserve_folders(), "flattened-folder preference persists")
@@ -56,6 +59,10 @@ func _run() -> void:
 		]
 	}])
 	_check(panel.visible, "library settings panel opens")
+	_check(
+		panel.artwork_fit.item_count == 3 and panel.artwork_fit.selected == 1,
+		"library settings exposes Smart, full-image, and fill-tile artwork modes"
+	)
 	var selector: OptionButton = panel.launcher_selectors.get("n64")
 	_check(selector != null and selector.item_count == 3, "launcher choices include automatic and compatible cores")
 	if selector != null:

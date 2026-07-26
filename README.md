@@ -137,6 +137,7 @@ See [Personal ROM library](docs/personal-rom-library.md) for aliases, artwork ma
 
 Open **Settings → Library & Launchers** to control:
 
+- Smart, full-image, or fill-tile game artwork fitting;
 - automatic folder icons;
 - automatic `wallpaper.*` backgrounds;
 - hierarchical or flat library browsing;

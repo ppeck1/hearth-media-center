@@ -735,7 +735,11 @@ func _activate(item: Dictionary, card: Button) -> void:
             _show_error("No ROMs found. Add game files under /srv/library/games/roms, then reopen Games.")
             return
         library_activity_store.reload()
-        library_browser.open_library(library_families, library_activity_store)
+        library_browser.open_library(
+            library_families,
+            library_activity_store,
+            library_settings_store.artwork_fit()
+        )
         return
     if kind == "submenu":
         var children: Array = item.get("children", [])
@@ -794,7 +798,11 @@ func _on_library_closed() -> void:
 
 func _on_library_refresh_requested() -> void:
     library_activity_store.reload()
-    library_browser.open_library(_library_systems(), library_activity_store)
+    library_browser.open_library(
+        _library_systems(),
+        library_activity_store,
+        library_settings_store.artwork_fit()
+    )
     footer.text = "Library refreshed"
 
 func _library_systems() -> Array:

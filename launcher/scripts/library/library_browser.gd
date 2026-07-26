@@ -19,6 +19,8 @@ const GRID_VIEWPORT_HEIGHT := 840.0
 const PAGE_JUMP_ROWS := 4
 const HOME_COLUMNS := 6
 const HOME_CARD_LIMIT := 6
+const ARTWORK_FIT_MODES: Array[String] = ["smart", "contain", "cover"]
+const SMART_COVER_MIN_VISIBLE_FRACTION := 0.88
 const BACKGROUND := preload("res://assets/backgrounds/arcade-attract-v1.png")
 
 var _families: Array = []
@@ -42,6 +44,7 @@ var _texture_cache: Dictionary = {}
 var _texture_order: Array[String] = []
 var _card_coordinates: Array[Vector2i] = []
 var _wallpaper_path := ""
+var _artwork_fit_mode := "smart"
 
 var _background: TextureRect
 var _drawer: PanelContainer
@@ -71,9 +74,10 @@ func _ready() -> void:
     else:
         visible = false
 
-func open_library(families: Array, activity_store: Variant = {}) -> void:
+func open_library(families: Array, activity_store: Variant = {}, artwork_fit := "smart") -> void:
     _families = families.duplicate(true)
     _activity_store = activity_store
+    _artwork_fit_mode = artwork_fit if artwork_fit in ARTWORK_FIT_MODES else "smart"
     _all_games = _flatten_games(_families)
     debug_total_games = _all_games.size()
     _is_open = true
@@ -413,9 +417,11 @@ func _make_card(item: Dictionary, card_position: Vector2, card_size: Vector2, in
     art.position = Vector2(8, 8)
     art.size = Vector2(card_size.x - 16, card_size.y - 52)
     art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-    art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED if str(item.get("art_fit", "")) == "contain" else TextureRect.STRETCH_KEEP_ASPECT_COVERED
     var art_path := str(item.get("art", ""))
     art.texture = _load_texture(art_path) if art_path.begins_with("res://") else null
+    var item_art_fit := str(item.get("art_fit", ""))
+    art.set_meta("fit_override", item_art_fit)
+    _apply_artwork_fit(art, item_art_fit)
     art.mouse_filter = Control.MOUSE_FILTER_IGNORE
     button.add_child(art)
     button.set_meta("art_node", art)
@@ -468,6 +474,32 @@ func _load_texture(path: String) -> Texture2D:
         var oldest: String = _texture_order.pop_front()
         _texture_cache.erase(oldest)
     return texture
+
+func _apply_artwork_fit(art: TextureRect, item_fit := "") -> void:
+    art.stretch_mode = _artwork_stretch_mode(art.texture, art.size, item_fit)
+
+func _artwork_stretch_mode(texture: Texture2D, viewport_size: Vector2, item_fit := "") -> int:
+    if item_fit == "contain":
+        return TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+    if item_fit == "cover":
+        return TextureRect.STRETCH_KEEP_ASPECT_COVERED
+    if _artwork_fit_mode == "contain":
+        return TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+    if _artwork_fit_mode == "cover":
+        return TextureRect.STRETCH_KEEP_ASPECT_COVERED
+    if texture == null or viewport_size.x <= 0.0 or viewport_size.y <= 0.0:
+        return TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+    var texture_size := texture.get_size()
+    if texture_size.x <= 0.0 or texture_size.y <= 0.0:
+        return TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+    var texture_ratio := texture_size.x / texture_size.y
+    var viewport_ratio := viewport_size.x / viewport_size.y
+    var visible_fraction := minf(texture_ratio, viewport_ratio) / maxf(texture_ratio, viewport_ratio)
+    return (
+        TextureRect.STRETCH_KEEP_ASPECT_COVERED
+        if visible_fraction >= SMART_COVER_MIN_VISIBLE_FRACTION
+        else TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+    )
 
 func _clear_cards() -> void:
     for child in _cards.get_children():
@@ -667,6 +699,7 @@ func _update_visible_card_art() -> void:
         var should_load := card.position.y + card.size.y >= visible_top and card.position.y <= visible_bottom
         if should_load and art.texture == null:
             art.texture = _load_texture(str(card.get_meta("external_art_path")))
+            _apply_artwork_fit(art, str(art.get_meta("fit_override", "")))
         elif not should_load and art.texture != null:
             art.texture = null
         mark.visible = art.texture == null

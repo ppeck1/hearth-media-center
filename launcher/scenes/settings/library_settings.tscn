@@ -62,6 +62,16 @@ columns = 2
 theme_override_constants/h_separation = 24
 theme_override_constants/v_separation = 8
 
+[node name="ArtworkFitLabel" type="Label" parent="Panel/Margin/Content/General"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 19
+text = "Game artwork"
+
+[node name="ArtworkFit" type="OptionButton" parent="Panel/Margin/Content/General"]
+custom_minimum_size = Vector2(650, 48)
+layout_mode = 2
+theme_override_font_sizes/font_size = 17
+
 [node name="FolderArtLabel" type="Label" parent="Panel/Margin/Content/General"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 19
@@ -119,7 +129,7 @@ theme_override_font_sizes/font_size = 23
 text = "System launchers"
 
 [node name="LauncherScroll" type="ScrollContainer" parent="Panel/Margin/Content"]
-custom_minimum_size = Vector2(0, 455)
+custom_minimum_size = Vector2(0, 395)
 layout_mode = 2
 size_flags_vertical = 3
 

@@ -53,6 +53,13 @@ Hearth always shows a cleaned game title beneath each game card. It looks for ar
 3. A private whole-system pack under `~/.local/share/hearth/artwork-packs`.
 4. The system mark and title as an offline fallback.
 
+The default **Smart** artwork fit measures each image when it loads. Artwork that
+closely matches the card fills the tile; square, portrait, or unusually wide art
+is scaled down so the full image remains visible instead of being harshly
+cropped. Open **Settings → Library & Launchers → Game artwork** to choose
+**Show full image** for no cropping or **Fill tile** for the previous edge-cropped
+appearance. The choice applies to the whole library—there is no per-game setup.
+
 The artwork tool never reads the ROM library and never makes title-by-title requests. Run `tools/sync-game-artwork.sh --list` to see the available generic packs, then pass one or more system IDs, for example:
 
 ```sh
