@@ -1,0 +1,14 @@
+[Unit]
+Description=Hearth Media Center
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/opt/hearth/launchers/hearth.sh
+Restart=on-failure
+RestartSec=3
+Environment=GODOT_LOG_LEVEL=warning
+
+[Install]
+WantedBy=graphical-session.target

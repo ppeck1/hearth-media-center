@@ -121,6 +121,7 @@ done
 test -f "${root}/input_bridge/tests/test_linux_runtime.py"
 python3 -m compileall -q "${root}/input_bridge"
 PYTHONPATH="${root}" python3 -m unittest discover -s "${root}/input_bridge/tests"
+PYTHONPATH="${root}" python3 -m unittest discover -s "${root}/deploy/fedora/tests"
 godot_bin="${HEARTH_GODOT:-}"
 if [[ -z "${godot_bin}" ]] && command -v godot >/dev/null 2>&1; then
   godot_bin="$(command -v godot)"
