@@ -74,6 +74,7 @@ trap 'if [[ "${HEARTH_DRY_RUN:-0}" != "1" && -d "${staging:-}" ]]; then find "${
 hearth_run install -d -m 0755 "${staging}"
 hearth_copy_tracked_tree "${source_root}" "${staging}"
 hearth_run install -D -m 0755 "${godot_source}" "${staging}/runtime/godot"
+hearth_import_godot_project "${staging}/runtime/godot" "${staging}/launcher"
 if [[ "${HEARTH_TEST_MODE:-0}" != "1" ]]; then
   hearth_run chown -R root:root "${staging}"
 fi

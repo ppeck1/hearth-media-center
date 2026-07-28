@@ -66,6 +66,9 @@ class DeploymentTests(unittest.TestCase):
         self.run_script("install.sh", "--source", str(REPO_ROOT), "--godot", str(GODOT))
         self.assertTrue((self.install_root / "launcher/project.godot").is_file())
         self.assertTrue((self.install_root / "runtime/godot").stat().st_mode & 0o100)
+        imported = self.install_root / "launcher/.godot/imported"
+        self.assertTrue(imported.is_dir())
+        self.assertTrue(any(path.is_file() for path in imported.iterdir()))
         self.assertTrue((self.target_home / ".config/systemd/user/hearth.service").is_file())
 
         personal_rom = self.library_root / "games/roms/Fixture Console/Private Fixture.rom"

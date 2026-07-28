@@ -97,6 +97,22 @@ hearth_copy_tracked_tree() {
   done < <(git -C "${source_root}" ls-files -z -- '*.sh' 'tools/*.py')
 }
 
+hearth_import_godot_project() {
+  local godot_runtime="$1"
+  local project_root="$2"
+
+  hearth_run "${godot_runtime}" --headless --path "${project_root}" --import
+  if [[ "${HEARTH_DRY_RUN:-0}" == "1" ]]; then
+    return 0
+  fi
+  if [[ ! -d "${project_root}/.godot/imported" ]] ||
+     ! find "${project_root}/.godot/imported" -type f -print -quit | grep -q .; then
+    printf 'Godot did not create the required imported-resource cache in %s.\n' \
+      "${project_root}" >&2
+    return 1
+  fi
+}
+
 hearth_find_godot() {
   local requested="${1:-}"
   if [[ -n "${requested}" && -x "${requested}" ]]; then
