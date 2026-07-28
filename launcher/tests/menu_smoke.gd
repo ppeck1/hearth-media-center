@@ -26,6 +26,15 @@ func _run() -> void:
 		_item_ids(games.get("children", [])) == ["my-library", "steam"],
 		"Games contains My Library and Steam Big Picture"
 	)
+	var settings: Dictionary = _item_with_id(hearth.items, "settings")
+	_check(
+		_item_ids(settings.get("children", [])).has("toggle-fullscreen"),
+		"Settings exposes a controller-accessible fullscreen toggle"
+	)
+	_check(
+		hearth.WINDOW_TITLE == "Hearth",
+		"the runtime window identity omits the debug suffix"
+	)
 	var movies_tv: Dictionary = _item_with_id(hearth.items, "movies-tv")
 	_check(movies_tv.get("menu_layout") == "tile_grid", "Movies & TV requests the tile-grid layout")
 	await hearth._show_menu(

@@ -52,14 +52,22 @@ class DeploymentTests(unittest.TestCase):
         self.temp.cleanup()
 
     def run_script(self, name: str, *arguments: str, check: bool = True) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(
-            [str(FEDORA_ROOT / name), *arguments],
-            cwd=REPO_ROOT,
-            env=self.env,
-            text=True,
-            capture_output=True,
-            check=check,
-        )
+        command = [str(FEDORA_ROOT / name), *arguments]
+        try:
+            return subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                env=self.env,
+                text=True,
+                capture_output=True,
+                check=check,
+            )
+        except subprocess.CalledProcessError as error:
+            self.fail(
+                f"{name} exited {error.returncode}\n"
+                f"stdout:\n{error.stdout}\n"
+                f"stderr:\n{error.stderr}"
+            )
 
     @unittest.skipUnless(GODOT.is_file(), "installed Godot fixture is unavailable")
     def test_install_update_uninstall_preserve_personal_state(self) -> None:
@@ -70,6 +78,13 @@ class DeploymentTests(unittest.TestCase):
         self.assertTrue(imported.is_dir())
         self.assertTrue(any(path.is_file() for path in imported.iterdir()))
         self.assertTrue((self.target_home / ".config/systemd/user/hearth.service").is_file())
+        desktop_entry = self.target_home / ".local/share/applications/hearth.desktop"
+        self.assertTrue(desktop_entry.is_file())
+        self.assertIn("Icon=hearth", desktop_entry.read_text(encoding="utf-8"))
+        desktop_icon = (
+            self.target_home / ".local/share/icons/hicolor/256x256/apps/hearth.png"
+        )
+        self.assertTrue(desktop_icon.is_file())
 
         personal_rom = self.library_root / "games/roms/Fixture Console/Private Fixture.rom"
         personal_rom.parent.mkdir(parents=True)
@@ -90,6 +105,8 @@ class DeploymentTests(unittest.TestCase):
 
         self.run_script("uninstall.sh")
         self.assertFalse(self.install_root.exists())
+        self.assertFalse(desktop_entry.exists())
+        self.assertFalse(desktop_icon.exists())
         self.assertEqual(personal_rom.read_bytes(), b"fixture")
         self.assertTrue(local_setting.is_file())
         self.assertTrue(browser_cookie.is_file())

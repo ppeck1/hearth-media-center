@@ -7,7 +7,8 @@ This is the complete customization map for Hearth. Use the UI for ordinary chang
 | Goal | Preferred place |
 | --- | --- |
 | Show or hide an existing streaming service | **Movies & TV → Manage Services** |
-| Change game artwork fit, folder icons, wallpapers, hierarchy, fullscreen mode, or RetroArch core | **Settings → Library & Launchers** |
+| Toggle Hearth fullscreen or windowed mode | **Settings → Fullscreen / Windowed** or **F11** |
+| Change game artwork fit, folder icons, wallpapers, hierarchy, RetroArch fullscreen mode, or RetroArch core | **Settings → Library & Launchers** |
 | Remap a controller or remote | **Settings → Controllers and Remotes** |
 | Inspect appliance status and remediation | **Settings → System Health** |
 | Add a ROM system or folder alias | [`system-registry.json`](../launcher/config/system-registry.json) |
@@ -127,7 +128,7 @@ Menu item fields:
 | `mark` | no | string | `•` | Text fallback when artwork is unavailable |
 | `color` | no | six-digit hex string | neutral slate | Accent color |
 | `art` | no | path | mark fallback | `res://` packaged image or supported local image |
-| `type` | yes | string | — | `submenu`, `command`, `panel`, or `library` |
+| `type` | yes | string | — | `submenu`, `command`, `panel`, `library`, or bounded `action` |
 | `enabled` | no | boolean | `true` | Makes the item selectable |
 | `children` | for submenu | array | `[]` | Nested item definitions |
 | `menu_layout` | no | string | `carousel` | `carousel` or `tile_grid` |
@@ -135,6 +136,7 @@ Menu item fields:
 | `args` | no | string array | `[]` | Arguments passed without shell evaluation |
 | `detached` | no | boolean | `false` | Records a launch and returns immediately |
 | `panel_id` | for panel | string | — | `library_settings`, `input_settings`, `streaming_services`, or bounded `system_health` |
+| `action_id` | for action | string | — | Bounded in-process action; currently only `toggle_fullscreen` |
 | `manageable_service` | no | boolean | `false` | Includes the destination in Movies & TV service management |
 
 ## `system-registry.json`
@@ -235,7 +237,7 @@ These variables change storage roots only. They do not broaden the executable, R
 
 | Helper | Arguments | Validation | Result |
 | --- | --- | --- | --- |
-| `hearth.sh` | none | deployment-relative runtime/project | Starts Godot on Wayland at 1920×1080 |
+| `hearth.sh` | none | deployment-relative runtime/project | Starts Godot fullscreen on Wayland at 1920×1080; Settings or F11 can switch to windowed mode |
 | `retroarch-game.sh` | `CORE_FILE ROM_PATH [fullscreen\|windowed]` | core filename and approved roots; ROM below personal library | Starts one game |
 | `pc-game.sh` | one allowlisted game ID | shell `case` allowlist | Starts one native/DOS/ScummVM/source-port title |
 | `devilutionx-game.sh` | `diablo` or `hellfire` | exact mode allowlist | Starts the matching DevilutionX mode |

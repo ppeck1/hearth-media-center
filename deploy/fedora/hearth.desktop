@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Hearth
+Comment=Controller-first living-room media center
+Exec=/opt/hearth/launchers/hearth.sh
+Icon=hearth
+Terminal=false
+Categories=Game;AudioVideo;
+StartupNotify=true
+StartupWMClass=Hearth

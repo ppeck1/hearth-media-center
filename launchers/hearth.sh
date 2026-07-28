@@ -7,4 +7,5 @@ hearth_root="$(cd "$(dirname "${script_path}")/.." && pwd)"
 exec "${hearth_root}/runtime/godot" \
   --path "${hearth_root}/launcher" \
   --display-driver wayland \
+  --fullscreen \
   --resolution 1920x1080

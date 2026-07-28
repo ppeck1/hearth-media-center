@@ -27,6 +27,8 @@ target_user="$(hearth_detect_user)"
 target_home="$(hearth_user_home "${target_user}")"
 target_uid="$(id -u "${target_user}")"
 service_path="${target_home}/.config/systemd/user/hearth.service"
+desktop_path="${target_home}/.local/share/applications/hearth.desktop"
+desktop_icon_path="${target_home}/.local/share/icons/hicolor/256x256/apps/hearth.png"
 
 if [[ "${HEARTH_DRY_RUN}" != "1" && "${HEARTH_TEST_MODE:-0}" != "1" && -d "/run/user/${target_uid}" ]]; then
   runuser -u "${target_user}" -- env XDG_RUNTIME_DIR="/run/user/${target_uid}" \
@@ -40,7 +42,9 @@ fi
 hearth_run rm -f \
   "${etc_root}/udev/rules.d/69-hearth-uinput.rules" \
   "${etc_root}/modules-load.d/hearth-uinput.conf" \
-  "${service_path}"
+  "${service_path}" \
+  "${desktop_path}" \
+  "${desktop_icon_path}"
 
 if (( remove_settings == 1 )); then
   settings_root="${target_home}/.config/hearth"

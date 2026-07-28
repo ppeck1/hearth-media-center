@@ -111,6 +111,12 @@ service_dir="${target_home}/.config/systemd/user"
 hearth_run install -D -o "${target_uid}" -g "${target_gid}" -m 0644 \
   "${source_root}/deploy/fedora/hearth.service" \
   "${service_dir}/hearth.service"
+hearth_run install -D -o "${target_uid}" -g "${target_gid}" -m 0644 \
+  "${source_root}/deploy/fedora/hearth.desktop" \
+  "${target_home}/.local/share/applications/hearth.desktop"
+hearth_run install -D -o "${target_uid}" -g "${target_gid}" -m 0644 \
+  "${source_root}/launcher/assets/app/hearth-icon.png" \
+  "${target_home}/.local/share/icons/hicolor/256x256/apps/hearth.png"
 hearth_enable_user_service "${target_user}" "${target_uid}"
 
 printf '\nInstallation report\n'

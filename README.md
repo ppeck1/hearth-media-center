@@ -20,7 +20,7 @@ The Home screen has four destinations:
 3. **Settings** — customize library folders, launchers, controllers, remotes, and desktop settings.
 4. **Power** — restart or shut down the appliance.
 
-Hearth is designed to work from a controller or ordinary remote. Arrow keys, Enter, Escape, and Home remain available as recovery controls.
+Hearth is designed to work from a controller or ordinary remote. Arrow keys, Enter, Escape, Home, and F11 remain available as recovery controls. The appliance starts fullscreen; choose **Settings → Fullscreen / Windowed** or press **F11** to toggle the display mode.
 
 ## Interface tour
 
@@ -150,6 +150,8 @@ Open **Settings → Controllers and Remotes** to:
 - choose a PS5 or standard-remote profile;
 - remap every semantic action;
 - test, reset, and save the profile.
+
+Open **Settings → Fullscreen / Windowed** to toggle Hearth itself without leaving the controller-first interface. **F11** provides the same keyboard fallback.
 
 Open **Settings → System Health** for a controller-accessible, privacy-bounded summary of the installation, runtimes, library count, input bridge, controller, display session, and launch-at-login service. It cannot run arbitrary commands and never renders personal filenames or credentials.
 

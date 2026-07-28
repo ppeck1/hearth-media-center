@@ -10,6 +10,8 @@ hearth_detect_user() {
     printf '%s\n' "${HEARTH_TARGET_USER}"
   elif [[ -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]]; then
     printf '%s\n' "${SUDO_USER}"
+  elif [[ -n "${PKEXEC_UID:-}" ]]; then
+    id -nu "${PKEXEC_UID}"
   else
     id -un
   fi

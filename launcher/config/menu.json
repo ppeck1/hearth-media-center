@@ -256,6 +256,18 @@
           "args": [],
           "detached": true,
           "enabled": true
+        },
+        {
+          "id": "toggle-fullscreen",
+          "label": "Fullscreen / Windowed",
+          "caption": "Fullscreen / Windowed",
+          "subtitle": "Toggle how Hearth fills the display",
+          "hint": "Switch display mode",
+          "mark": "⛶",
+          "color": "426d8d",
+          "type": "action",
+          "action_id": "toggle_fullscreen",
+          "enabled": true
         }
       ]
     },

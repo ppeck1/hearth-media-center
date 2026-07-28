@@ -4,6 +4,7 @@ config_version=5
 [application]
 config/name="Hearth"
 config/version="0.1.0-alpha"
+config/icon="res://assets/app/hearth-icon.png"
 run/main_scene="res://main.tscn"
 
 [display]

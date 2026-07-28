@@ -26,6 +26,10 @@ hearth_validate_roots "${install_root}" "${library_root}"
 hearth_require_fedora
 hearth_session_report
 hearth_require_root_for_changes
+target_user="$(hearth_detect_user)"
+target_home="$(hearth_user_home "${target_user}")"
+target_uid="$(id -u "${target_user}")"
+target_gid="$(id -g "${target_user}")"
 [[ -f "${install_root}/launcher/project.godot" ]] || {
   printf 'No Hearth installation was found at %s. Run install.sh first.\n' "${install_root}" >&2
   exit 1
@@ -58,6 +62,12 @@ if ! hearth_run mv "${staging}" "${install_root}"; then
   exit 1
 fi
 hearth_run find "${previous}" -depth -delete
+hearth_run install -D -o "${target_uid}" -g "${target_gid}" -m 0644 \
+  "${install_root}/deploy/fedora/hearth.desktop" \
+  "${target_home}/.local/share/applications/hearth.desktop"
+hearth_run install -D -o "${target_uid}" -g "${target_gid}" -m 0644 \
+  "${install_root}/launcher/assets/app/hearth-icon.png" \
+  "${target_home}/.local/share/icons/hicolor/256x256/apps/hearth.png"
 
 printf 'Update installed successfully.\n'
 printf 'Backup: %s\n' "${backup_root}"

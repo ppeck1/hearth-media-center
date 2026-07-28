@@ -10,7 +10,9 @@ const REGISTRY_PATH := "res://config/system-registry.json"
 const LIBRARY_ROOT := "/srv/library/games/roms"
 const SYSTEM_CORE_ROOT := "/usr/lib64/libretro"
 const HOME_MENU_PATH := "HEARTH  •  LIVING ROOM"
+const WINDOW_TITLE := "Hearth"
 const HOME_BACKGROUND := preload("res://assets/backgrounds/arcade-living-room-v4.png")
+const APP_ICON := preload("res://assets/app/hearth-icon.png")
 const ARCADE_BACKGROUND_PATH := "res://assets/backgrounds/arcade-attract-v1.png"
 const VIDEO_CLUB_BACKGROUND_PATH := "res://assets/backgrounds/video-club-aisle-v1.png"
 const CONSOLE_GALLERY_BACKGROUND_PATH := "res://assets/backgrounds/console-gallery-v1.png"
@@ -126,6 +128,7 @@ var input_rearm_at_msec := 0
 @onready var system_health = $SystemHealth
 
 func _ready() -> void:
+    _apply_window_identity()
     input_rearm_at_msec = Time.get_ticks_msec() + 450
     input_settings.closed.connect(_on_input_settings_closed)
     library_browser.launch_requested.connect(_on_library_launch_requested)
@@ -156,6 +159,23 @@ func _ready() -> void:
     move_child(modal, get_child_count() - 1)
     _load_registry()
     _load_home()
+
+func _apply_window_identity() -> void:
+    DisplayServer.window_set_title(WINDOW_TITLE)
+    DisplayServer.set_icon(APP_ICON.get_image())
+
+func _toggle_fullscreen() -> void:
+    var current_mode := DisplayServer.window_get_mode()
+    if current_mode in [
+        DisplayServer.WINDOW_MODE_FULLSCREEN,
+        DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN,
+    ]:
+        DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+        DisplayServer.window_set_size(Vector2i(1280, 720))
+        footer.text = "Windowed mode • F11 toggles fullscreen"
+    else:
+        DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+        footer.text = "Fullscreen mode • F11 toggles windowed mode"
 
 func _build_ui() -> void:
     art_shader = Shader.new()
@@ -763,6 +783,10 @@ func _activate(item: Dictionary, card: Button) -> void:
     if kind == "unavailable":
         _show_error(str(item.get("error", "Install and map a compatible RetroArch core first.")))
         return
+    if kind == "action":
+        if str(item.get("action_id", "")) == "toggle_fullscreen":
+            _toggle_fullscreen()
+        return
     if kind != "command":
         return
     _launch_command(item)
@@ -1306,6 +1330,10 @@ func _is_library_metadata(filename: String) -> bool:
     return filename.get_extension().to_lower() in ["md", "txt", "nfo", "json", "xml", "jpg", "jpeg", "png", "webp"]
 
 func _unhandled_input(event: InputEvent) -> void:
+    if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F11:
+        _toggle_fullscreen()
+        get_viewport().set_input_as_handled()
+        return
     if not _can_accept_navigation_input():
         return
     if modal.visible:
